@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Claude
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# Data output
+output/
