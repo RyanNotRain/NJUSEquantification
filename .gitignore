@@ -10,6 +10,31 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Source data and adjustment factors (not published)
+data/
+adjfactor.pkl
+*.pkl
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# Generated models and experiment runs (not published)
+*.pt
+*.pth
+*.ckpt
+*.joblib
+checkpoints/
+runs/
+artifacts/
 
 # Claude
 .claude/
@@ -18,5 +43,15 @@ __pycache__/
 .vscode/
 .idea/
 
-# Data output
+# Office temporary files
+~$*
+
+# Generated outputs
 output/
+
+# Large delivery archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z

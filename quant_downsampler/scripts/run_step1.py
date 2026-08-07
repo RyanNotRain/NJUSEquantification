@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--overwrite", action="store_true",
-        help="覆盖已存在的日频表",
+        help="覆盖已存在的全部日频和分钟频表",
     )
     p.add_argument(
         "--log-level", default="INFO",
@@ -59,6 +59,7 @@ def main() -> None:
         dates=args.dates,
         out_dir=args.out,
         days_per_chunk=args.days_per_chunk,
+        overwrite=args.overwrite,
     )
 
 

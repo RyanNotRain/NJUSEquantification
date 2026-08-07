@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-downsampler"
+version = "1.0.0"
+description = "Tick downsampling, factor evaluation, backtesting, and minute LSTM research pipeline"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "scipy>=1.12",
+  "matplotlib>=3.8",
+  "scikit-learn>=1.4",
+  "torch>=2.2",
+]
+
+[project.scripts]
+qd-downsample = "scripts.run_step1:main"
+qd-factors = "scripts.run_factor_eval:main"
+qd-backtest = "scripts.run_backtest:main"
+qd-lstm = "scripts.run_lstm:main"
+qd-lstm-full = "scripts.run_lstm_full:main"
+qd-lstm-full-eval = "scripts.evaluate_lstm_full:main"
+
+[tool.setuptools]
+packages = ["qd", "scripts"]

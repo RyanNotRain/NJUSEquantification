@@ -84,7 +84,7 @@ def load_one_day(date: str) -> dict[str, pd.DataFrame]:
         return {}
 
     result: dict[str, pd.DataFrame] = {}
-    for csv_path in day_dir.glob("*.csv"):
+    for csv_path in sorted(day_dir.glob("*.csv")):
         code = csv_path.stem
         try:
             df = pd.read_csv(csv_path, dtype=_DTYPES)

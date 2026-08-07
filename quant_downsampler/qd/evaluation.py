@@ -1,18 +1,4 @@
-"""因子评价模块。
-
-计算:
-- IC (Information Coefficient): 因子值与前向收益率的 Pearson 相关系数
-- IR (Information Ratio): mean(IC) / std(IC)
-- ICIR: 同 IR
-- rank_IC: 因子值与前向收益率的 Spearman 秩相关系数
-- rank_IR: mean(rank_IC) / std(rank_IC)
-- rank_ICIR: 同 rank_IR
-- 因子分层效果: 按因子值分 N 组,计算各组平均收益率
-
-输出:
-- 表格: 每个因子的 IC/IR/ICIR/rank_IC/rank_IR/rank_ICIR
-- 图表: 累计 IC 曲线、分层收益柱状图
-"""
+"""Reproducible IC and quantile-layer evaluation."""
 
 from __future__ import annotations
 
@@ -23,270 +9,202 @@ import pandas as pd
 from scipy import stats
 
 from .config import OUTPUT_DIR
-from .factors import compute_all_factors, load_daily_data
+from .factors import FACTOR_NAMES, compute_all_factors, load_daily_data, save_factors
+
+
+def _markdown_table(table: pd.DataFrame, percent: bool = False) -> str:
+    frame = table.copy()
+    formatter = (lambda x: f"{x:.6%}") if percent else (lambda x: f"{x:.6f}")
+    headers = [str(frame.index.name or "factor"), *map(str, frame.columns)]
+    lines = ["| " + " | ".join(headers) + " |", "|" + "|".join(["---"] * len(headers)) + "|"]
+    for idx, row in frame.iterrows():
+        values = [str(idx)] + [formatter(float(v)) if pd.notna(v) else "NaN" for v in row]
+        lines.append("| " + " | ".join(values) + " |")
+    return "\n".join(lines)
 
 
 def compute_ic_series(
     factor: pd.DataFrame,
     forward_return: pd.DataFrame,
     method: str = "pearson",
+    min_stocks: int = 30,
 ) -> pd.Series:
-    """计算每日截面 IC 序列。
-
-    每天对横截面上的因子值和前向收益率求相关系数。
-
-    Args:
-        factor: 因子值,行=日期,列=股票
-        forward_return: 前向收益率,行=日期,列=股票
-        method: "pearson" 或 "spearman"
-
-    Returns:
-        Series,索引=日期,值=IC
-    """
-    common_dates = factor.index.intersection(forward_return.index)
-    common_stocks = factor.columns.intersection(forward_return.columns)
-
-    if len(common_dates) == 0 or len(common_stocks) == 0:
-        return pd.Series(dtype=float)
-
-    f = factor.loc[common_dates, common_stocks]
-    r = forward_return.loc[common_dates, common_stocks]
-
-    ic_values = []
-    ic_dates = []
-
-    for date in common_dates:
-        f_row = f.loc[date].dropna()
-        r_row = r.loc[date].dropna()
-        common = f_row.index.intersection(r_row.index)
-        if len(common) < 10:  # 至少 10 只股票才计算
+    dates = factor.index.intersection(forward_return.index)
+    stocks = factor.columns.intersection(forward_return.columns)
+    values: dict[pd.Timestamp, float] = {}
+    for date in dates:
+        pair = pd.concat(
+            [factor.loc[date, stocks], forward_return.loc[date, stocks]], axis=1
+        ).replace([np.inf, -np.inf], np.nan).dropna()
+        if len(pair) < min_stocks or pair.iloc[:, 0].nunique() < 2 or pair.iloc[:, 1].nunique() < 2:
             continue
-        f_vals = f_row[common].values
-        r_vals = r_row[common].values
-
-        # 移除 inf
-        mask = np.isfinite(f_vals) & np.isfinite(r_vals)
-        if mask.sum() < 10:
-            continue
-
         if method == "pearson":
-            corr, _ = stats.pearsonr(f_vals[mask], r_vals[mask])
+            corr = stats.pearsonr(pair.iloc[:, 0], pair.iloc[:, 1]).statistic
+        elif method == "spearman":
+            corr = stats.spearmanr(pair.iloc[:, 0], pair.iloc[:, 1]).statistic
         else:
-            corr, _ = stats.spearmanr(f_vals[mask], r_vals[mask])
-
+            raise ValueError("method must be pearson or spearman")
         if np.isfinite(corr):
-            ic_values.append(corr)
-            ic_dates.append(date)
-
-    return pd.Series(ic_values, index=ic_dates, name=method)
+            values[pd.Timestamp(date)] = float(corr)
+    return pd.Series(values, name=method, dtype=np.float64).sort_index()
 
 
-def compute_ic_stats(ic_series: pd.Series) -> dict[str, float]:
-    """从 IC 序列计算统计指标。
-
-    Returns:
-        dict with keys: IC_mean, IC_std, IR, ICIR, IC_positive_ratio, IC_t_stat
-    """
-    if len(ic_series) < 2:
-        return {"IC_mean": np.nan, "IC_std": np.nan, "IR": np.nan,
-                "ICIR": np.nan, "IC_positive_ratio": np.nan, "IC_t_stat": np.nan}
-
-    ic = ic_series.dropna()
-    mean_ic = ic.mean()
-    std_ic = ic.std(ddof=1)
-    ir = mean_ic / std_ic if std_ic > 0 else np.nan
-    positive_ratio = (ic > 0).mean()
-    t_stat = mean_ic / (std_ic / np.sqrt(len(ic))) if std_ic > 0 else np.nan
-
-    return {
-        "IC_mean": mean_ic,
-        "IC_std": std_ic,
-        "IR": ir,
-        "ICIR": ir,
-        "IC_positive_ratio": positive_ratio,
-        "IC_t_stat": t_stat,
-    }
-
-
-def evaluate_single_factor(
-    factor: pd.DataFrame,
-    forward_return: pd.DataFrame,
-    factor_name: str = "",
+def _series_stats(
+    series: pd.Series,
+    mean_key: str,
+    ir_key: str,
+    icir_key: str,
 ) -> dict[str, float]:
-    """评价单个因子,返回所有指标。"""
-    ic_pearson = compute_ic_series(factor, forward_return, method="pearson")
-    ic_spearman = compute_ic_series(factor, forward_return, method="spearman")
-
-    pearson_stats = compute_ic_stats(ic_pearson)
-    spearman_stats = compute_ic_stats(ic_spearman)
-
+    x = series.dropna()
+    if len(x) < 2:
+        return {mean_key: np.nan, f"{mean_key}_std": np.nan,
+                icir_key: np.nan, ir_key: np.nan}
+    mean = float(x.mean())
+    std = float(x.std(ddof=1))
+    icir = mean / std if std > 0 else np.nan
+    annual_ir = icir * np.sqrt(252) if np.isfinite(icir) else np.nan
     return {
-        "factor": factor_name,
-        "IC": pearson_stats["IC_mean"],
-        "IR": pearson_stats["IR"],
-        "ICIR": pearson_stats["ICIR"],
-        "IC_positive_ratio": pearson_stats["IC_positive_ratio"],
-        "IC_t_stat": pearson_stats["IC_t_stat"],
-        "rank_IC": spearman_stats["IC_mean"],
-        "rank_IR": spearman_stats["IR"],
-        "rank_ICIR": spearman_stats["ICIR"],
-        "rank_IC_positive_ratio": spearman_stats["IC_positive_ratio"],
-        "n_days": len(ic_pearson),
+        mean_key: mean,
+        f"{mean_key}_std": std,
+        icir_key: icir,
+        ir_key: annual_ir,
     }
 
 
 def evaluate_all_factors(
     factors: dict[str, pd.DataFrame],
     forward_return: pd.DataFrame,
-) -> pd.DataFrame:
-    """评价所有因子,返回汇总表。"""
-    factor_names = [k for k in factors if k != "forward_return_1d"]
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     rows = []
-    for name in factor_names:
-        stats = evaluate_single_factor(factors[name], forward_return, name)
-        rows.append(stats)
-    return pd.DataFrame(rows).set_index("factor").sort_values("ICIR", ascending=False)
+    ic_table: dict[str, pd.Series] = {}
+    rank_table: dict[str, pd.Series] = {}
+    for name in FACTOR_NAMES:
+        ic = compute_ic_series(factors[name], forward_return, "pearson")
+        rank_ic = compute_ic_series(factors[name], forward_return, "spearman")
+        ic_table[name] = ic
+        rank_table[name] = rank_ic
+        ic_stats = _series_stats(ic, "IC", "IR", "ICIR")
+        rank_stats = _series_stats(
+            rank_ic, "rank_IC", "rank_IR", "rank_ICIR"
+        )
+        rows.append({
+            "factor": name,
+            **ic_stats,
+            **rank_stats,
+            "IC_positive_ratio": float((ic > 0).mean()),
+            "rank_IC_positive_ratio": float((rank_ic > 0).mean()),
+            "n_days": int(len(ic)),
+        })
+    summary = pd.DataFrame(rows).set_index("factor")
+    summary["abs_ICIR"] = summary["ICIR"].abs()
+    summary = summary.sort_values("abs_ICIR", ascending=False)
+    return summary, pd.DataFrame(ic_table), pd.DataFrame(rank_table)
 
 
-# ---------------------------------------------------------------------------
-# 因子分层分析
-# ---------------------------------------------------------------------------
-
-def factor_layering(
+def factor_layering_daily(
     factor: pd.DataFrame,
     forward_return: pd.DataFrame,
     n_groups: int = 5,
 ) -> pd.DataFrame:
-    """因子分层分析。
-
-    每天按因子值将股票分成 n_groups 组,计算每组平均前向收益率。
-    返回每组的平均收益率(时间序列均值)。
-
-    Returns:
-        DataFrame, columns=[group, mean_return, t_stat]
-    """
-    common_dates = factor.index.intersection(forward_return.index)
-    common_stocks = factor.columns.intersection(forward_return.columns)
-
-    f = factor.loc[common_dates, common_stocks]
-    r = forward_return.loc[common_dates, common_stocks]
-
-    group_returns = {i: [] for i in range(n_groups)}
-
-    for date in common_dates:
-        f_row = f.loc[date].dropna()
-        r_row = r.loc[date].dropna()
-        common = f_row.index.intersection(r_row.index)
-        if len(common) < n_groups * 3:
+    dates = factor.index.intersection(forward_return.index)
+    stocks = factor.columns.intersection(forward_return.columns)
+    rows: dict[pd.Timestamp, dict[str, float]] = {}
+    for date in dates:
+        pair = pd.concat(
+            [factor.loc[date, stocks].rename("factor"),
+             forward_return.loc[date, stocks].rename("return")], axis=1
+        ).replace([np.inf, -np.inf], np.nan).dropna()
+        if len(pair) < n_groups * 6 or pair["factor"].nunique() < n_groups:
             continue
-
-        f_vals = f_row[common].values
-        r_vals = r_row[common].values
-
-        mask = np.isfinite(f_vals) & np.isfinite(r_vals)
-        if mask.sum() < n_groups * 3:
-            continue
-
-        f_vals = f_vals[mask]
-        r_vals = r_vals[mask]
-
-        # 按因子值分位数分组
-        try:
-            labels = pd.qcut(f_vals, n_groups, labels=False, duplicates="drop")
-        except ValueError:
-            continue
-
-        for g in range(n_groups):
-            g_mask = labels == g
-            if g_mask.sum() > 0:
-                group_returns[g].append(r_vals[g_mask].mean())
-
-    result_rows = []
-    for g in range(n_groups):
-        arr = np.array(group_returns[g])
-        if len(arr) > 1:
-            mean_ret = arr.mean()
-            t_stat = mean_ret / (arr.std(ddof=1) / np.sqrt(len(arr))) if arr.std() > 0 else 0
-            result_rows.append({
-                "group": g + 1,
-                "label": f"Q{g + 1}",
-                "mean_return": mean_ret,
-                "t_stat": t_stat,
-                "n_days": len(arr),
-            })
-
-    return pd.DataFrame(result_rows).set_index("group")
+        ranks = pair["factor"].rank(method="first")
+        groups = pd.qcut(ranks, n_groups, labels=False) + 1
+        rows[pd.Timestamp(date)] = {
+            f"Q{group}": float(pair.loc[groups == group, "return"].mean())
+            for group in range(1, n_groups + 1)
+        }
+    return pd.DataFrame.from_dict(rows, orient="index").sort_index()
 
 
-def layering_all_factors(
-    factors: dict[str, pd.DataFrame],
-    forward_return: pd.DataFrame,
-    n_groups: int = 5,
-) -> dict[str, pd.DataFrame]:
-    """对所有因子做分层分析。"""
-    results = {}
-    factor_names = [k for k in factors if k != "forward_return_1d"]
-    for name in factor_names:
-        results[name] = factor_layering(factors[name], forward_return, n_groups)
-    return results
-
-
-# ---------------------------------------------------------------------------
-# 报告生成
-# ---------------------------------------------------------------------------
-
-def print_evaluation_report(
-    summary: pd.DataFrame,
-    layerings: dict[str, pd.DataFrame],
+def _plot_results(
+    ic_daily: pd.DataFrame,
+    layer_means: pd.DataFrame,
+    out_dir: Path,
 ) -> None:
-    """打印因子评价报告。"""
-    print("\n" + "=" * 80)
-    print("因子评价报告")
-    print("=" * 80)
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
 
-    print("\n--- IC/IR/ICIR 汇总 ---")
-    cols = ["IC", "IR", "ICIR", "rank_IC", "rank_IR", "rank_ICIR",
-            "IC_positive_ratio", "n_days"]
-    print(summary[cols].to_string(float_format=lambda x: f"{x:.4f}"))
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ic_daily.fillna(0).cumsum().plot(ax=ax)
+    ax.set_title("Cumulative daily IC")
+    ax.set_ylabel("Cumulative IC")
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out_dir / "cumulative_ic.png", dpi=160)
+    plt.close(fig)
 
-    print("\n--- 因子分层效果 (Top vs Bottom) ---")
-    for name, layering in layerings.items():
-        if layering.empty:
-            continue
-        top = layering.loc[layering.index.max(), "mean_return"]
-        bot = layering.loc[layering.index.min(), "mean_return"]
-        spread = top - bot
-        print(f"  {name:<30s}  Q1={bot:+.6f}  Q{layering.index.max()}={top:+.6f}  spread={spread:+.6f}")
-
-    # 综合排名
-    print("\n--- 综合排名(按ICIR降序) ---")
-    for i, (idx, row) in enumerate(summary.iterrows()):
-        print(f"  {i+1:2d}. {idx:<30s}  IC={row['IC']:+.4f}  IR={row['IR']:+.3f}  rank_IC={row['rank_IC']:+.4f}")
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharey=True)
+    for ax, name in zip(axes.ravel(), FACTOR_NAMES):
+        layer_means.loc[name].plot.bar(ax=ax)
+        ax.set_title(name)
+        ax.set_ylabel("Mean next-day return")
+        ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(out_dir / "factor_layers.png", dpi=160)
+    plt.close(fig)
 
 
-def run_evaluation(data_dir: Path | None = None) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
-    """运行完整因子评价流程。
+def _write_report(summary: pd.DataFrame, layer_means: pd.DataFrame, out_dir: Path) -> None:
+    display = summary[["IC", "IR", "ICIR", "rank_IC", "rank_IR", "rank_ICIR", "n_days"]]
+    lines = [
+        "# 因子构建与评价报告",
+        "",
+        "本报告由 `scripts/run_factor_eval.py` 根据当前复权日频数据自动生成。",
+        "",
+        "## 因子",
+        "",
+        "- 示例因子：`log(std(MA1, MA5, MA10, MA20 of amount))`",
+        "- 另构建三个因子：5 日动量、主买主卖失衡、日内振幅。",
+        "",
+        "## IC/IR/ICIR",
+        "",
+        "`ICIR = mean(IC)/std(IC)`；`IR = sqrt(252) × ICIR`。负 IC 表示反向有效，排名按 `|ICIR|`。",
+        "",
+        _markdown_table(display),
+        "",
+        "## 五分层平均次日收益",
+        "",
+        _markdown_table(layer_means, percent=True),
+        "",
+        "详细的每日 IC、Rank IC、分层收益和图表均保存在本目录，可直接复核。",
+    ]
+    (out_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    Returns:
-        (summary_df, layerings_dict, factors_dict)
-    """
-    data_dir = data_dir or (OUTPUT_DIR / "daily")
-    daily_data = load_daily_data(data_dir)
 
-    print("计算因子...")
-    factors = compute_all_factors(daily_data)
+def run_evaluation(
+    data_dir: Path | None = None,
+    out_dir: Path | None = None,
+) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
+    target = Path(out_dir or (OUTPUT_DIR / "factors"))
+    target.mkdir(parents=True, exist_ok=True)
+    data = load_daily_data(data_dir)
+    factors = compute_all_factors(data)
+    forward = factors["forward_return_1d"]
+    summary, ic_daily, rank_ic_daily = evaluate_all_factors(factors, forward)
+    layerings = {
+        name: factor_layering_daily(factors[name], forward) for name in FACTOR_NAMES
+    }
+    layer_means = pd.DataFrame({name: x.mean() for name, x in layerings.items()}).T
 
-    forward_return = factors.pop("forward_return_1d")
-
-    print("评价因子...")
-    summary = evaluate_all_factors(factors, forward_return)
-
-    print("分层分析...")
-    layerings = layering_all_factors(factors, forward_return)
-
-    print_evaluation_report(summary, layerings)
-
-    # 把 forward_return 放回去，方便调用方直接保存
-    factors["forward_return_1d"] = forward_return
-
+    save_factors(factors, target)
+    summary.to_csv(target / "evaluation_summary.csv", float_format="%.8f")
+    ic_daily.to_csv(target / "ic_daily.csv", float_format="%.8f")
+    rank_ic_daily.to_csv(target / "rank_ic_daily.csv", float_format="%.8f")
+    layer_means.to_csv(target / "layer_mean_returns.csv", float_format="%.8f")
+    layer_dir = target / "layering_daily"
+    layer_dir.mkdir(exist_ok=True)
+    for name, table in layerings.items():
+        table.to_csv(layer_dir / f"{name}.csv", float_format="%.8f")
+    _plot_results(ic_daily, layer_means, target)
+    _write_report(summary, layer_means, target)
     return summary, layerings, factors

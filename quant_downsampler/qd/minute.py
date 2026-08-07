@@ -1,89 +1,58 @@
-"""分钟频降采样:从一天的 tick 算出 237 个分钟 bar × 11 个指标。
-
-分钟 bar 覆盖(共 237 个,见 config.TOTAL_BARS):
-    9:30, 9:31, ..., 11:30(120 个)
-    13:00, 13:01, ..., 14:56(117 个)
-
-输出格式(readme):
-    minute/{metric}/{YYYYMMDD}.csv
-    每个 metric 一个文件夹,内含每日一张表。
-    表内行=分钟标签(9:30, 9:31, ..., 14:56),列=股票代码。
-
-指标定义(同日频,只是把"日"换成"分钟"):
-    open/high/low/close: 该分钟 bar 内首笔/最大/最小/末笔成交价
-    volume/trade_count/amount: 该分钟 bar 内汇总
-    buy_volume/sell_volume/buy_amount/sell_amount: BSFlag==0/1 的子集
-
-集合竞价(BSFlag==2)不进入分钟 bar。
-
-填充规则(readme 第 9 条):
-    连续竞价阶段(高开低收)价 用前 1 分钟收盘价填充。
-    (对每只股票单独在 bar 方向 ffill)
-    成交量/笔数/主买主卖额:0。
-"""
+"""Minute aggregation matching the README's displayed trading-time rows."""
 
 from __future__ import annotations
-
-from typing import Iterable
 
 import numpy as np
 import pandas as pd
 
-from .config import METRICS
+from .adjfactor import full_stock_code, get_adjust_ratio
+from .config import (
+    CONTINUOUS_AFTERNOON_END_SEC,
+    METRICS,
+    MORNING_BARS,
+    PRICE_METRICS,
+)
 from .data_loader import load_one_day
 from .time_utils import MINUTE_BAR_LABELS
 
 
-def calc_minute_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    """从单只股票单天的 tick 算出 237 × 11 的 DataFrame(行=bar idx,列=metric)。
-
-    返回的 DataFrame 索引是 0..236,列是 METRICS。
-    """
+def calc_minute_metrics(
+    df: pd.DataFrame,
+    adjust_ratio: float = 1.0,
+) -> pd.DataFrame:
     out = pd.DataFrame(
-        {m: np.nan if m in {"open", "high", "low", "close"} else 0.0
-         for m in METRICS},
+        {m: np.nan if m in PRICE_METRICS else 0.0 for m in METRICS},
         index=range(len(MINUTE_BAR_LABELS)),
+        dtype=np.float64,
     )
-
     if df is None or df.empty:
         return out
 
-    # 过滤集合竞价(bar == -1 的 tick)
-    df = df[df["minute_bar"] >= 0]
-    if df.empty:
+    trades = df[df["minute_bar"] >= 0].copy()
+    if trades.empty:
         return out
-
-    # 计算派生列(向量化,避免 groupby 多次扫描)
-    price_real = df["Price"].astype(np.float64) / 100.0
-    amount = price_real * df["Volume"].astype(np.float64)
-    bsflag = df["BSFlag"].to_numpy()
-    is_buy = bsflag == 0
-    is_sell = bsflag == 1
-
+    price_raw = trades["Price"].to_numpy(dtype=np.float64) / 100.0
+    price_adjusted = price_raw * adjust_ratio
+    volume = trades["Volume"].to_numpy(dtype=np.float64)
+    flags = trades["BSFlag"].to_numpy(dtype=np.int8)
+    amount = price_raw * volume
     work = pd.DataFrame({
-        "minute_bar": df["minute_bar"].to_numpy(),
-        "price_real": price_real.to_numpy(),
-        "volume": df["Volume"].to_numpy(dtype=np.float64),
-        "trade_count": np.ones(len(df), dtype=np.float64),
-        "amount": amount.to_numpy(),
-        "buy_volume": np.where(is_buy, df["Volume"].to_numpy(), 0.0),
-        "sell_volume": np.where(is_sell, df["Volume"].to_numpy(), 0.0),
-        "buy_amount": np.where(is_buy, amount.to_numpy(), 0.0),
-        "sell_amount": np.where(is_sell, amount.to_numpy(), 0.0),
-    })
-
-    # 按 minute_bar 分组聚合
-    # 注意:为了保证"first"和"last"是 bar 内的首末笔,先按 time_sec 排
-    work = work.join(df["time_sec"].reset_index(drop=True))
-    work = work.sort_values(["minute_bar", "time_sec"], kind="mergesort")
-
-    grouped = work.groupby("minute_bar", sort=True)
-
-    agg = grouped.agg(
-        open=("price_real", "first"),
-        high=("price_real", "max"),
-        low=("price_real", "min"),
-        close=("price_real", "last"),
+        "minute_bar": trades["minute_bar"].to_numpy(dtype=np.int32),
+        "time_sec": trades["time_sec"].to_numpy(dtype=np.float64),
+        "price": price_adjusted,
+        "volume": volume,
+        "trade_count": np.ones(len(trades), dtype=np.float64),
+        "amount": amount,
+        "buy_volume": np.where(flags == 0, volume, 0.0),
+        "sell_volume": np.where(flags == 1, volume, 0.0),
+        "buy_amount": np.where(flags == 0, amount, 0.0),
+        "sell_amount": np.where(flags == 1, amount, 0.0),
+    }).sort_values(["minute_bar", "time_sec"], kind="mergesort")
+    agg = work.groupby("minute_bar", sort=True).agg(
+        open=("price", "first"),
+        high=("price", "max"),
+        low=("price", "min"),
+        close=("price", "last"),
         volume=("volume", "sum"),
         trade_count=("trade_count", "sum"),
         amount=("amount", "sum"),
@@ -92,32 +61,66 @@ def calc_minute_metrics(df: pd.DataFrame) -> pd.DataFrame:
         buy_amount=("buy_amount", "sum"),
         sell_amount=("sell_amount", "sum"),
     )
-
-    # 写回 out(未覆盖的位置保持 NaN/0)
     out.loc[agg.index, agg.columns] = agg
     return out
 
 
 def aggregate_day_minute(date: str) -> dict[str, pd.DataFrame]:
-    """处理一天的所有股票,返回 {stock_code: 237×11 DataFrame}。"""
-    day_data = load_one_day(date)
-    return {code: calc_minute_metrics(df) for code, df in day_data.items()}
+    result: dict[str, pd.DataFrame] = {}
+    for data_code, df in load_one_day(date).items():
+        result[full_stock_code(data_code)] = calc_minute_metrics(
+            df, get_adjust_ratio(data_code, date)
+        )
+    return result
 
 
-def _apply_minute_fill_rules(
-    wide: pd.DataFrame, metric: str, prev_close: float | None
-) -> pd.DataFrame:
-    """对单张宽表(行=分钟 bar,列=股票)应用填充规则。
+def _fill_continuous_prices(
+    raw_prices: dict[str, pd.DataFrame],
+    prev_close: dict[str, float] | None,
+) -> dict[str, pd.DataFrame]:
+    """Fill missing continuous-session OHLC with the previous minute close.
 
-    - OHLC 沿行方向 ffill(前 1 分钟 close 填充)
-    - 成交类:NaN 填 0
-    - 如果提供了 prev_close,先用它填 9:30 bar 的剩余 NaN
+    14:57-14:59 are call-auction waiting rows and deliberately remain NaN.
+    The 15:00 row contains only actually matched closing-auction prices.
     """
-    if metric in {"open", "high", "low", "close"}:
-        if prev_close is not None:
-            wide.iloc[0] = wide.iloc[0].fillna(prev_close)
-        return wide.ffill(axis=0)
-    return wide.fillna(0.0)
+    close = raw_prices["close"].copy()
+    if prev_close:
+        for stock, value in prev_close.items():
+            if stock in close.columns and pd.notna(value) and pd.isna(close.iloc[0][stock]):
+                close.iloc[0, close.columns.get_loc(stock)] = float(value)
+
+    # Fill morning and continuous afternoon separately, carrying the morning
+    # close into 13:00 when necessary.
+    close.iloc[:MORNING_BARS] = close.iloc[:MORNING_BARS].ffill(axis=0)
+    afternoon_continuous_count = int((CONTINUOUS_AFTERNOON_END_SEC - 13 * 3600) // 60)
+    afternoon_start = MORNING_BARS
+    afternoon_stop = afternoon_start + afternoon_continuous_count
+    seed = close.iloc[MORNING_BARS - 1]
+    close.iloc[afternoon_start] = close.iloc[afternoon_start].fillna(seed)
+    close.iloc[afternoon_start:afternoon_stop] = close.iloc[
+        afternoon_start:afternoon_stop
+    ].ffill(axis=0)
+
+    previous = close.shift(1)
+    if prev_close:
+        for stock, value in prev_close.items():
+            if stock in previous.columns and pd.notna(value):
+                previous.iloc[0, previous.columns.get_loc(stock)] = float(value)
+    previous.iloc[afternoon_start] = seed
+    filled: dict[str, pd.DataFrame] = {"close": close}
+    for metric in ("open", "high", "low"):
+        table = raw_prices[metric].copy()
+        table.iloc[:MORNING_BARS] = table.iloc[:MORNING_BARS].where(
+            table.iloc[:MORNING_BARS].notna(), previous.iloc[:MORNING_BARS]
+        )
+        table.iloc[afternoon_start:afternoon_stop] = table.iloc[
+            afternoon_start:afternoon_stop
+        ].where(
+            table.iloc[afternoon_start:afternoon_stop].notna(),
+            previous.iloc[afternoon_start:afternoon_stop],
+        )
+        filled[metric] = table
+    return filled
 
 
 def build_minute_table_for_date(
@@ -125,47 +128,37 @@ def build_minute_table_for_date(
     prev_close: dict[str, float] | None = None,
     all_stocks: list[str] | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """处理一天的数据,返回 11 张宽表(行=分钟 bar,列=股票代码)。
-
-    Args:
-        date: 交易日
-        prev_close: 前一交易日每只股票的收盘价(用于 9:30 bar 跨日填充)
-        all_stocks: 全局股票列表(列的完整集合,保证每天列数一致)。
-            缺失的股票当天该列为 NaN/0。
-    """
     per_stock = aggregate_day_minute(date)
-
-    # 决定列集合
-    if all_stocks is None:
-        all_stocks = sorted(per_stock.keys())
-    else:
-        # 把当天有数据的也并入,保证不会丢
-        all_stocks = sorted(set(all_stocks) | set(per_stock.keys()))
-
-    if not all_stocks:
+    stocks = sorted(set(all_stocks or []) | set(per_stock))
+    if not stocks:
         return {}
 
-    # 每天为每个 metric 拼一张宽表
+    timestamp_index = pd.to_datetime(
+        [f"{pd.Timestamp(date).strftime('%Y-%m-%d')} {t}" for t in MINUTE_BAR_LABELS]
+    )
+    raw: dict[str, pd.DataFrame] = {}
+    for metric in METRICS:
+        data = {
+            stock: (
+                per_stock[stock][metric].to_numpy()
+                if stock in per_stock
+                else np.full(len(timestamp_index), np.nan)
+            )
+            for stock in stocks
+        }
+        table = pd.DataFrame(data, index=timestamp_index, dtype=np.float64)
+        table.index.name = "datetime"
+        table.columns.name = "stock"
+        raw[metric] = table
+
+    filled_prices = _fill_continuous_prices(
+        {m: raw[m] for m in PRICE_METRICS}, prev_close
+    )
     out: dict[str, pd.DataFrame] = {}
     for metric in METRICS:
-        data: dict[str, np.ndarray] = {}
-        for stock in all_stocks:
-            if stock in per_stock:
-                data[stock] = per_stock[stock][metric].to_numpy()
-            else:
-                data[stock] = np.full(len(MINUTE_BAR_LABELS), np.nan)
-        wide = pd.DataFrame(data, index=MINUTE_BAR_LABELS)
-        wide.index.name = "minute"
-        wide.columns.name = "stock"
-
-        if metric in {"open", "high", "low", "close"}:
-            if prev_close:
-                for s in all_stocks:
-                    if s in prev_close and prev_close[s] is not None and pd.isna(wide.iloc[0][s]):
-                        wide.iloc[0, wide.columns.get_loc(s)] = prev_close[s]
-            wide = wide.ffill(axis=0)
-        else:
-            wide = wide.fillna(0.0)
-        out[metric] = wide.astype(np.float64)
-
+        out[metric] = (
+            filled_prices[metric]
+            if metric in PRICE_METRICS
+            else raw[metric].fillna(0.0)
+        ).astype(np.float64)
     return out

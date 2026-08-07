@@ -1,31 +1,25 @@
-"""Task 4: 策略回测。
-
-用法:
-    python scripts/run_backtest.py
-    python scripts/run_backtest.py --lookback 120 --top-n 15
-"""
+"""Run corrected and deliberately biased comparison backtests."""
 
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-from qd.backtest import run_full_backtest  # noqa: E402
+from qd.backtest import run_full_backtest
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="策略回测")
-    p.add_argument("--data-dir", type=Path, default=None, help="日频数据目录")
-    p.add_argument("--lookback", type=int, default=60, help="IC 权重回看窗口")
-    p.add_argument("--top-n", type=int, default=10, help="每期选股数")
-    args = p.parse_args()
-
-    run_full_backtest(args.data_dir, lookback=args.lookback, top_n=args.top_n)
+    parser = argparse.ArgumentParser(description="IC-weighted top-N backtest")
+    parser.add_argument("--data-dir", type=Path, default=None)
+    parser.add_argument("--out-dir", type=Path, default=None)
+    parser.add_argument("--lookback", type=int, default=60)
+    parser.add_argument("--top-n", type=int, default=10)
+    args = parser.parse_args()
+    results = run_full_backtest(
+        args.data_dir, args.out_dir, args.lookback, args.top_n
+    )
+    for name, result in results.items():
+        print(name, result["metrics"])
 
 
 if __name__ == "__main__":
