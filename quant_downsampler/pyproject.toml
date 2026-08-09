@@ -31,6 +31,9 @@ qd-lstm-strategy = "scripts.run_lstm_strategy:main"
 qd-lstm-baselines = "scripts.run_lstm_baselines:main"
 qd-lstm-adjust = "scripts.adjust_lstm_fusion:main"
 qd-lstm-hybrid = "scripts.run_lstm_hybrid:main"
+qd-lstm-return = "scripts.run_lstm_return:main"
+qd-lstm-return-baselines = "scripts.run_lstm_return_baselines:main"
+qd-lstm-strategy-compare = "scripts.run_lstm_strategy_comparison:main"
 
 [tool.setuptools]
 packages = ["qd", "scripts"]

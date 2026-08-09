@@ -29,6 +29,8 @@ def main() -> None:
     parser.add_argument(
         "--costs-bps", type=_cost_grid, default=(0.0, 5.0, 10.0, 20.0, 30.0, 50.0)
     )
+    parser.add_argument("--bootstrap-iterations", type=int, default=2_000)
+    parser.add_argument("--bootstrap-seed", type=int, default=20250809)
     args = parser.parse_args()
     result = run_backtest_robustness(
         args.data_dir,
@@ -38,11 +40,19 @@ def main() -> None:
         buffer_n=args.buffer_n,
         max_replacements=args.max_replacements,
         costs_bps=args.costs_bps,
+        bootstrap_iterations=args.bootstrap_iterations,
+        bootstrap_seed=args.bootstrap_seed,
     )
     print(json.dumps(result["summary"], ensure_ascii=False, indent=2))
     print(result["stress"][["total_return", "sharpe_ratio", "max_drawdown"]])
+    print("\nFactor strategies versus the sample-universe equal-weight proxy:")
+    for name, metrics in result["benchmark_report"]["strategies"].items():
+        print(
+            f"{name}: strategy={metrics['strategy_total_return']:.2%}, "
+            f"market={metrics['benchmark_total_return']:.2%}, "
+            f"lead={metrics['percentage_point_lead']:.2f} pp"
+        )
 
 
 if __name__ == "__main__":
     main()
-

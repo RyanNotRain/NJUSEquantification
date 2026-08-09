@@ -16,6 +16,12 @@ ADDITIONAL_FACTORS = (
 )
 FACTOR_NAMES = ("example_factor",) + ADDITIONAL_FACTORS
 
+# Experimental factors are deliberately kept outside ``FACTOR_NAMES``.  The
+# latter is the assignment's official four-factor universe and is consumed by
+# the published evaluation tables, whose four-row definition must not drift as
+# exploratory ideas are added.
+EXPERIMENTAL_FACTOR_NAMES = ("illiquidity_20d",)
+
 
 def load_daily_data(data_dir: Path | None = None) -> dict[str, pd.DataFrame]:
     data_dir = Path(data_dir or (OUTPUT_DIR / "daily"))
@@ -71,6 +77,33 @@ def compute_intraday_range(
     return (high - low) / close.replace(0, np.nan)
 
 
+def compute_illiquidity_20d(
+    close: pd.DataFrame,
+    amount: pd.DataFrame,
+    window: int = 20,
+) -> pd.DataFrame:
+    """Strictly historical 20-day Amihud-style illiquidity.
+
+    For each stock and table date ``s`` the factor is the trailing mean of
+    ``abs(daily return) / amount`` using observations through the close of
+    ``s``.  The backtest, like every official factor path, makes its date-``t``
+    decision from the factor row dated ``t-1``; consequently no date-``t``
+    amount or return enters the signal.  It is an experimental research factor
+    and is not one of the assignment's three required additional factors.
+    """
+    if window < 2:
+        raise ValueError("window must be at least 2")
+    if not close.index.equals(amount.index) or not close.columns.equals(amount.columns):
+        raise ValueError("close and amount axes must match")
+    absolute_return = close.pct_change(fill_method=None).abs()
+    positive_amount = amount.where(amount > 0.0)
+    daily_illiquidity = absolute_return.divide(positive_amount)
+    factor = daily_illiquidity.rolling(
+        window=window, min_periods=window
+    ).mean()
+    return factor.replace([np.inf, -np.inf], np.nan)
+
+
 def compute_forward_returns(close: pd.DataFrame, period: int = 1) -> pd.DataFrame:
     return close.shift(-period) / close - 1.0
 
@@ -88,6 +121,9 @@ def compute_all_factors(
         ),
         "intraday_range": compute_intraday_range(
             data["high"], data["low"], data["close"]
+        ),
+        "illiquidity_20d": compute_illiquidity_20d(
+            data["close"], data["amount"]
         ),
         "forward_return_1d": compute_forward_returns(data["close"]),
     }

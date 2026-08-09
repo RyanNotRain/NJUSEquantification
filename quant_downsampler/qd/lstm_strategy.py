@@ -25,6 +25,7 @@ PROBABILITY_COLUMNS = ("prob_down", "prob_flat", "prob_up")
 TIERS = ("all", "balanced", "strict")
 WEIGHTINGS = ("equal", "confidence")
 SIDES = ("long_short", "long_only")
+SIGNAL_MODES = ("probability_gap", "expected_return")
 
 
 def _required_columns(frame: pd.DataFrame, columns: Iterable[str]) -> None:
@@ -205,24 +206,39 @@ def generate_target_weights(
     confidence_threshold: float | None = None,
     require_directional_argmax: bool = True,
     side: str = "long_short",
+    signal_mode: str = "probability_gap",
 ) -> pd.DataFrame:
     """Create cross-sectional target weights using prediction-time data only.
 
-    ``signal_score`` is ``P(up) - P(down)``.  Equal weighting assigns equal
-    absolute weight to active names; confidence weighting uses the absolute
-    directional probability gap.  Both are normalised to unit gross exposure
-    at each prediction timestamp.  By default, a flat argmax means no trade.
+    In ``probability_gap`` mode, ``signal_score`` is ``P(up) - P(down)``.  In
+    ``expected_return`` mode it is the precomputed ``expected_return_bps``
+    available at prediction time.  Equal weighting assigns equal absolute
+    weight to active names; confidence weighting uses the absolute signal.
+    Both are normalised to unit gross exposure at each prediction timestamp.
+    By default, a flat argmax means no trade.
     """
     if weighting not in WEIGHTINGS:
         raise ValueError(f"weighting must be one of {WEIGHTINGS}")
     if side not in SIDES:
         raise ValueError(f"side must be one of {SIDES}")
-    if not np.isfinite(score_threshold) or not 0.0 <= score_threshold <= 1.0:
-        raise ValueError("score_threshold must lie within [0, 1]")
+    if signal_mode not in SIGNAL_MODES:
+        raise ValueError(f"signal_mode must be one of {SIGNAL_MODES}")
+    if not np.isfinite(score_threshold) or score_threshold < 0.0:
+        raise ValueError("score_threshold must be finite and non-negative")
+    if signal_mode == "probability_gap" and score_threshold > 1.0:
+        raise ValueError(
+            "probability-gap score_threshold must lie within [0, 1]"
+        )
 
     frame = validate_predictions(predictions)
     tier_selected = _tier_mask(frame, tier, confidence_threshold)
-    score = frame["prob_up"] - frame["prob_down"]
+    if signal_mode == "probability_gap":
+        score = frame["prob_up"] - frame["prob_down"]
+    else:
+        _required_columns(frame, ("expected_return_bps",))
+        score = pd.to_numeric(frame["expected_return_bps"], errors="coerce")
+        if not np.isfinite(score.to_numpy(dtype=np.float64)).all():
+            raise ValueError("expected_return_bps must be finite")
     active = tier_selected & score.abs().ge(float(score_threshold)) & score.ne(0.0)
     if require_directional_argmax:
         active &= frame[["prob_up", "prob_down"]].max(axis=1) > frame["prob_flat"]
@@ -251,6 +267,7 @@ def generate_target_weights(
     frame["tier"] = tier
     frame["weighting"] = weighting
     frame["side"] = side
+    frame["signal_mode"] = signal_mode
     frame["require_directional_argmax"] = bool(require_directional_argmax)
     frame["score_threshold"] = float(score_threshold)
     return frame.sort_values(["_window_end_ts", "stock"]).reset_index(drop=True)
@@ -503,6 +520,7 @@ def run_strategy_suite(
     confidence_thresholds: Mapping[str, float] | None = None,
     require_directional_argmax: bool = True,
     side: str = "long_short",
+    signal_mode: str = "probability_gap",
     base_cost_bps: float = 5.0,
     cost_grid_bps: Sequence[float] = (0.0, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0),
     overwrite: bool = False,
@@ -535,6 +553,7 @@ def run_strategy_suite(
                 confidence_threshold=thresholds.get(tier),
                 require_directional_argmax=require_directional_argmax,
                 side=side,
+                signal_mode=signal_mode,
             )
             path = build_portfolio_path(weighted)
             statistics = strategy_statistics(path, cost_bps=base_cost_bps)
@@ -555,6 +574,7 @@ def run_strategy_suite(
                 "tier": tier,
                 "weighting": weighting,
                 "side": side,
+                "signal_mode": signal_mode,
                 "selection_rate": selection_rate,
                 "active_signal_rate": active_signal_rate,
                 "active_signal_n": int(active.sum()),
@@ -597,7 +617,12 @@ def run_strategy_suite(
     report: dict[str, object] = {
         "predictions_path": str(source),
         "close_dir": str(Path(close_dir)),
-        "signal_definition": "prob_up - prob_down",
+        "signal_mode": signal_mode,
+        "signal_definition": (
+            "prob_up - prob_down"
+            if signal_mode == "probability_gap"
+            else "expected_return_bps"
+        ),
         "score_threshold": float(score_threshold),
         "require_directional_argmax": bool(require_directional_argmax),
         "side": side,

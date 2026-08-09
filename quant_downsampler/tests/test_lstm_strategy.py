@@ -82,6 +82,40 @@ class LSTMStrategyTests(unittest.TestCase):
         self.assertAlmostEqual(first.at["A", "target_weight"], 0.60 / 1.05)
         self.assertAlmostEqual(first.at["B", "target_weight"], -0.45 / 1.05)
 
+    def test_expected_return_signal_uses_prediction_time_magnitude(self) -> None:
+        data = _predictions()
+        data["expected_return_bps"] = [4.0, -1.0, 8.0, -9.0]
+        weights = generate_target_weights(
+            data,
+            weighting="confidence",
+            score_threshold=2.0,
+            signal_mode="expected_return",
+            require_directional_argmax=False,
+        )
+        first = weights[weights["window_end"].eq("2025-01-02 10:00:00")].set_index("stock")
+        self.assertAlmostEqual(first.at["A", "target_weight"], 1.0)
+        self.assertEqual(first.at["B", "target_weight"], 0.0)
+        second = weights[weights["window_end"].eq("2025-01-02 10:01:00")].set_index("stock")
+        self.assertAlmostEqual(second.at["A", "target_weight"], 8.0 / 17.0)
+        self.assertAlmostEqual(second.at["B", "target_weight"], -9.0 / 17.0)
+
+    def test_expected_return_weights_ignore_realised_return(self) -> None:
+        original = _predictions()
+        original["expected_return_bps"] = [2.0, -3.0, 0.5, -0.5]
+        mutated = original.copy()
+        mutated["realised_return"] = [9.0, -9.0, 4.0, -4.0]
+        first = generate_target_weights(
+            original,
+            signal_mode="expected_return",
+            require_directional_argmax=False,
+        )
+        second = generate_target_weights(
+            mutated,
+            signal_mode="expected_return",
+            require_directional_argmax=False,
+        )
+        np.testing.assert_allclose(first["target_weight"], second["target_weight"])
+
     def test_selected_string_false_is_not_treated_as_true(self) -> None:
         data = _predictions()
         data["selected_balanced"] = ["True", "False", "False", "False"]

@@ -479,6 +479,60 @@ def validate_research_enhancements(output_dir: Path) -> dict:
             "break_even_one_way_bps": break_even,
         }
 
+        benchmark_path = backtest_root / "benchmark_metrics.json"
+        if benchmark_path.exists():
+            benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+            if benchmark["official_factor_names"] != list(FACTOR_NAMES):
+                raise AssertionError("market report changed the official factor universe")
+            experimental = benchmark.get("experimental_factor_names", [])
+            if experimental != ["illiquidity_20d"]:
+                raise AssertionError("experimental factor scope is missing or ambiguous")
+            if not benchmark["benchmark_definition"].get("not_an_index_claim"):
+                raise AssertionError("sample market proxy is mislabeled as an index")
+            periods = pd.read_csv(backtest_root / "benchmark_periods.csv")
+            required_columns = {
+                "date", "strategy", "strategy_net_return", "market_return",
+                "strategy_nav", "benchmark_nav", "relative_wealth",
+                "n_market_stocks",
+            }
+            if not required_columns.issubset(periods.columns):
+                raise AssertionError("factor market-period table is incomplete")
+            for strategy_name, group in periods.groupby("strategy", sort=False):
+                group = group.copy()
+                dates = pd.to_datetime(group["date"], errors="coerce")
+                if dates.isna().any() or dates.duplicated().any() or not dates.is_monotonic_increasing:
+                    raise AssertionError(f"factor market dates are invalid: {strategy_name}")
+                strategy_nav = (1.0 + group["strategy_net_return"]).cumprod()
+                market_nav = (1.0 + group["market_return"]).cumprod()
+                if not np.allclose(strategy_nav, group["strategy_nav"], atol=1e-8):
+                    raise AssertionError(f"strategy NAV identity differs: {strategy_name}")
+                if not np.allclose(market_nav, group["benchmark_nav"], atol=1e-8):
+                    raise AssertionError(f"market NAV identity differs: {strategy_name}")
+                if not np.allclose(
+                    strategy_nav / market_nav, group["relative_wealth"], atol=1e-8
+                ):
+                    raise AssertionError(f"relative wealth identity differs: {strategy_name}")
+                if (group["n_market_stocks"] != 300).any():
+                    raise AssertionError("daily market proxy does not use all 300 sample stocks")
+            single = pd.read_csv(
+                backtest_root / "single_factor_market_metrics.csv", index_col=0
+            )
+            if set(single.index) != {*FACTOR_NAMES, "illiquidity_20d"}:
+                raise AssertionError("single-factor market report has the wrong factor set")
+            if single.loc["illiquidity_20d", "factor_scope"] != "experimental":
+                raise AssertionError("illiquidity factor was promoted into the official set")
+            illiquidity = pd.read_csv(
+                backtest_root / "illiquidity_20d.csv", index_col=0
+            )
+            if illiquidity.shape != (302, 300):
+                raise AssertionError("experimental illiquidity factor shape differs")
+            report["factor_market_benchmark"] = {
+                "strategies": int(periods["strategy"].nunique()),
+                "official_factors": len(FACTOR_NAMES),
+                "experimental_factors": len(experimental),
+                "market_stock_count": 300,
+            }
+
     baseline_root = output_dir / "lstm_baselines"
     if baseline_root.exists():
         metrics = json.loads(
@@ -575,6 +629,178 @@ def validate_research_enhancements(output_dir: Path) -> dict:
         report[directory] = {
             "strategies": int(sensitivity["strategy"].nunique()),
             "test_days": int(sensitivity["n_days"].iloc[0]),
+        }
+
+    return_root = output_dir / "lstm_return"
+    if return_root.exists():
+        predictions = pd.read_csv(return_root / "test_predictions.csv")
+        required = {
+            "stock", "window_end", "target_time", "true_label",
+            "prob_down", "prob_flat", "prob_up", "predicted_abs_return_bps",
+            "expected_return_bps", "realised_return_bps",
+        }
+        if not required.issubset(predictions.columns) or len(predictions) != 5_900:
+            raise AssertionError("return-LSTM prediction table is incomplete")
+        probability = predictions[["prob_down", "prob_flat", "prob_up"]].to_numpy(float)
+        if not np.isfinite(probability).all() or not np.allclose(
+            probability.sum(axis=1), 1.0, atol=1e-5
+        ):
+            raise AssertionError("return-LSTM probabilities are invalid")
+        magnitude = predictions["predicted_abs_return_bps"].to_numpy(float)
+        expected = predictions["expected_return_bps"].to_numpy(float)
+        realised = predictions["realised_return_bps"].to_numpy(float)
+        if not np.isfinite(np.column_stack((magnitude, expected, realised))).all() or (
+            magnitude < 0.0
+        ).any():
+            raise AssertionError("return-LSTM magnitude outputs are invalid")
+        if not np.allclose(
+            expected, (probability[:, 2] - probability[:, 0]) * magnitude, atol=1e-6
+        ):
+            raise AssertionError("return-LSTM expected-return identity differs")
+        expected_labels = np.where(realised < 0.0, 0, np.where(realised > 0.0, 2, 1))
+        if not np.array_equal(expected_labels, predictions["true_label"].to_numpy(int)):
+            raise AssertionError("return-LSTM labels and signed returns differ")
+        metrics = json.loads(
+            (return_root / "test_metrics.json").read_text(encoding="utf-8")
+        )
+        signed = metrics["signed_expected_return"]
+        if not np.isclose(
+            float(np.mean(np.abs(expected - realised))), float(signed["mae_bps"]),
+            atol=1e-8,
+        ):
+            raise AssertionError("return-LSTM signed MAE differs")
+        freeze = json.loads(
+            (return_root / "selection_frozen_before_test.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if freeze.get("test_loaded_before_freeze") or freeze.get(
+            "test_metrics_used_for_selection"
+        ):
+            raise AssertionError("return-LSTM selection used the test split")
+        floor = float(freeze["opening_threshold_floor_one_way_bps"])
+        if any(
+            float(value) < floor
+            for value in freeze["selected_opening_threshold_bps"].values()
+        ):
+            raise AssertionError("return-LSTM bps threshold is below the cost floor")
+        probability_thresholds = freeze.get("selected_probability_gap_threshold", {})
+        if set(probability_thresholds) != {"long_short", "long_only"} or any(
+            not 0.0 <= float(value) <= 1.0
+            for value in probability_thresholds.values()
+        ):
+            raise AssertionError("return-LSTM probability-gap threshold is invalid")
+        strategy_table = pd.read_csv(return_root / "strategy_comparison.csv")
+        expected_rows = strategy_table["comparison_signal"].eq("expected_return")
+        gap_rows = strategy_table["comparison_signal"].eq("probability_gap")
+        if not expected_rows.any() or not gap_rows.any():
+            raise AssertionError("return-LSTM strategy ablation is incomplete")
+        if not strategy_table.loc[
+            expected_rows, "validation_frozen_threshold_unit"
+        ].eq("bps").all() or not strategy_table.loc[
+            expected_rows, "validation_frozen_threshold_bps"
+        ].ge(floor).all():
+            raise AssertionError("return-LSTM bps threshold units are invalid")
+        if not strategy_table.loc[
+            gap_rows, "validation_frozen_threshold_unit"
+        ].eq("probability_gap").all() or not strategy_table.loc[
+            gap_rows, "validation_frozen_threshold_bps"
+        ].isna().all():
+            raise AssertionError("return-LSTM probability threshold is mislabeled as bps")
+        replay = json.loads((return_root / "replay_audit.json").read_text(encoding="utf-8"))
+        if not replay.get("passed") or float(replay["maximum_absolute_difference"]) > 1e-6:
+            raise AssertionError("return-LSTM persisted replay failed")
+        report["lstm_return"] = {
+            "n": int(len(predictions)),
+            "magnitude_mae_bps": float(metrics["magnitude"]["mae_bps"]),
+            "expected_return_spearman": float(signed["spearman_ic"]),
+            "strict_replay": True,
+        }
+
+    return_baseline_root = output_dir / "lstm_return_baselines"
+    if return_baseline_root.exists():
+        metrics = json.loads(
+            (return_baseline_root / "test_metrics.json").read_text(encoding="utf-8")
+        )
+        audit = metrics["audit"]
+        if not audit.get("test_loaded_after_selection_frozen") or audit.get(
+            "test_used_for_hyperparameter_or_threshold_selection"
+        ):
+            raise AssertionError("return-regression baselines used test information")
+        replay = audit.get("persistence_replay", {})
+        if not replay.get("passed") or replay.get("raw_test_data_load_count") != 1:
+            raise AssertionError("return-regression baseline replay failed")
+        predictions = pd.read_csv(return_baseline_root / "test_predictions.csv")
+        if len(predictions) != 5_900:
+            raise AssertionError("return-regression test row count differs")
+        for model_name in ("ridge", "hist_gradient_boosting_regressor"):
+            canonical = pd.read_csv(
+                return_baseline_root / f"{model_name}_test_predictions.csv"
+            )
+            if not predictions[["stock", "window_end", "target_time"]].equals(
+                canonical[["stock", "window_end", "target_time"]]
+            ):
+                raise AssertionError(f"canonical return keys differ: {model_name}")
+            source_column = f"{model_name}_expected_return_bps"
+            if not np.allclose(
+                predictions[source_column], canonical["expected_return_bps"], atol=1e-9
+            ):
+                raise AssertionError(f"canonical return predictions differ: {model_name}")
+        sensitivity = pd.read_csv(
+            return_baseline_root / "strategy_cost_sensitivity.csv"
+        )
+        for _, group in sensitivity.groupby(["model", "side"]):
+            ordered = group.sort_values("cost_bps")
+            if (ordered["net_total_return"].diff().dropna() > 1e-12).any():
+                raise AssertionError("return-regression strategy improves with cost")
+        report["lstm_return_baselines"] = {
+            "n": int(len(predictions)),
+            "models": 2,
+            "strict_replay": True,
+        }
+
+    for directory in (
+        "lstm_strategy_comparison_full",
+        "lstm_strategy_comparison_full_long_only",
+    ):
+        comparison_root = output_dir / directory
+        if not comparison_root.exists():
+            continue
+        metrics = json.loads(
+            (comparison_root / "metrics.json").read_text(encoding="utf-8")
+        )
+        alignment = metrics["alignment_audit"]
+        if not (
+            alignment.get("all_sample_keys_exactly_equal")
+            and alignment.get("full_stock_cross_section_at_every_interval")
+            and int(alignment.get("n_rows", 0)) == 5_900
+        ):
+            raise AssertionError(f"unified strategy alignment failed: {directory}")
+        methodology = metrics["methodology"]
+        if methodology.get("benchmark_used_for_model_or_threshold_selection"):
+            raise AssertionError(f"market benchmark affected selection: {directory}")
+        summary = pd.read_csv(comparison_root / "strategy_comparison.csv")
+        expected_names = {
+            "original_lstm", "hist_gradient_boosting", "hybrid",
+            "magnitude_lstm", "ridge_return", "histgb_return",
+            "equal_weight_market_proxy",
+            "equal_weight_buy_and_hold_observed_horizons",
+        }
+        if set(summary["name"]) != expected_names:
+            raise AssertionError(f"unified strategy model set differs: {directory}")
+        market = float(
+            summary.loc[
+                summary["name"].eq("equal_weight_market_proxy"),
+                "gross_total_return",
+            ].iloc[0]
+        )
+        relative = (1.0 + summary["net_total_return"]) / (1.0 + market) - 1.0
+        if not np.allclose(relative, summary["net_relative_to_market_proxy"], atol=1e-8):
+            raise AssertionError(f"unified relative-return identity differs: {directory}")
+        report[directory] = {
+            "models": int(summary["kind"].eq("model").sum()),
+            "benchmarks": int(summary["kind"].eq("benchmark").sum()),
+            "n": int(alignment["n_rows"]),
         }
     return report
 

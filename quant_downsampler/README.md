@@ -8,6 +8,8 @@
 4. 以 1,000 万元构建每日 Top 10 组合，分别进行收盘价和次日开盘价调仓，并对比含前视偏差的原始方法与修正版。
 5. 使用分钟数据训练端到端 LSTM：主模型预测下一分钟跌/平/涨；同时保留非平价条件下的方向二分类作为诊断。
 
+任务书之外还有三组实验：20 日 Amihud 型非流动性因子、300 股日频等权市场代理，以及同时预测方向和涨跌幅的多任务 LSTM。实验因子最终没有通过显著性和收益检验，因此不计入官方四因子。
+
 ## 2. 数据口径
 
 ### 2.1 股票代码和复权
@@ -74,7 +76,7 @@ python -m scripts.run_factor_robustness
 # 四组回测：修正版/Naive × 收盘/开盘
 python -m scripts.run_backtest --lookback 60 --top-n 10
 
-# 修正版组合的换手约束与对称双边成本压力
+# 换手/成本压力、300 股等权市场代理和单因子经济检验
 python -m scripts.run_backtest_robustness
 
 # 单模型研究训练；默认选前 5 只股票，安全写入 output/lstm_runs/nonflat_binary
@@ -103,10 +105,38 @@ python -m scripts.run_lstm_strategy --side long_short
 python -m scripts.run_lstm_strategy \
   --side long_only --out-dir ../output/lstm_strategy_long_only
 
+# 方向+涨跌幅多任务 LSTM；所有选择在验证集冻结
+python -m scripts.run_lstm_return --stocks 5 --hidden 32 --layers 1 --dropout 0.1 --epochs 6 --batch-size 512 --magnitude-lambdas 0.1 0.3 1.0 --device cpu --overwrite
+
+# 同窗口的 Ridge / HistGradientBoostingRegressor 收益率基线
+python -m scripts.run_lstm_return_baselines --stocks 5 --overwrite
+
+# 统一 long-short 比较：同一 5 股、日期、分钟区间、仓位引擎和单边 5 bps
+python -m scripts.run_lstm_strategy_comparison \
+  --magnitude-predictions ../output/lstm_return/test_predictions.csv \
+  --magnitude-threshold-bps 5 \
+  --ridge-return-predictions ../output/lstm_return_baselines/ridge_test_predictions.csv \
+  --ridge-return-threshold-bps 7.845224356651299 \
+  --histgb-return-predictions ../output/lstm_return_baselines/hist_gradient_boosting_regressor_test_predictions.csv \
+  --histgb-return-threshold-bps 7.676776335646997 \
+  --out-dir ../output/lstm_strategy_comparison_full \
+  --side long_short --overwrite
+
+# 同口径 long-only 比较
+python -m scripts.run_lstm_strategy_comparison \
+  --magnitude-predictions ../output/lstm_return/test_predictions.csv \
+  --magnitude-threshold-bps 5 \
+  --ridge-return-predictions ../output/lstm_return_baselines/ridge_test_predictions.csv \
+  --ridge-return-threshold-bps 7.845224356651299 \
+  --histgb-return-predictions ../output/lstm_return_baselines/hist_gradient_boosting_regressor_test_predictions.csv \
+  --histgb-return-threshold-bps 7.676776335646997 \
+  --out-dir ../output/lstm_strategy_comparison_full_long_only \
+  --side long_only --overwrite
+
 # 验收全部产物；LSTM 会逐样本重放并核对概率
 python -m scripts.validate_outputs
 
-# 当前共有 56 项单元测试
+# 运行全部单元测试；数量以本命令的实际输出为准
 python -m unittest discover -s tests -v
 ```
 
@@ -127,6 +157,9 @@ qd-lstm-hybrid --overwrite
 qd-lstm-research --evaluate-components --calibrate --overwrite
 qd-lstm-adjust --overwrite
 qd-lstm-strategy --side long_short
+qd-lstm-return --stocks 5 --hidden 32 --layers 1 --dropout 0.1 --epochs 6 --batch-size 512 --magnitude-lambdas 0.1 0.3 1.0 --device cpu --overwrite
+qd-lstm-return-baselines --stocks 5 --overwrite
+qd-lstm-strategy-compare --help
 ```
 
 ## 5. 因子
@@ -153,6 +186,24 @@ qd-lstm-strategy --side long_short
 
 现有数据没有真实行业或市值暴露表，因此中性化被明确标记为 `skipped`；模块提供连续/分类暴露接口，但不会用股票代码或随机分组伪造行业数据。波动状态来自已经实现的目标期收益，只是事后压力诊断，不能作为交易时可见特征。
 
+### 5.2 实验因子：20 日 Amihud 型非流动性
+
+`illiquidity_20d` 是单独的实验因子，定义为过去 20 日 `abs(daily_return)/amount` 的均值。因子表第 `s` 日只包含截至 `s` 收盘的数据，交易日 `t` 的策略统一读取 `t-1` 因子；方向由截至 `t-2` 可见的滚动 IC 决定。
+
+它不在 `FACTOR_NAMES` 中，也不是任务书规定的三个新因子之一。这一点不是名称区别：正式四因子的 `evaluation_summary.csv` 仍然只有四行。
+
+| 检验 | `illiquidity_20d` |
+|---|---:|
+| 全样本平均 IC | 0.00738 |
+| 全样本平均 Rank IC | 0.02230 |
+| 5 日区块 bootstrap 95% CI | [-0.00550, 0.02017] |
+| bootstrap `p` 值 | 0.240 |
+| 2026Q2 平均 IC | -0.00733 |
+| 与官方因子的最大平均截面 Spearman | -0.580（示例因子） |
+| 单因子成本后收益 / 同期市场代理 | -7.32% / 4.48% |
+
+置信区间跨 0，最近季度的方向也反转；成本后落后同期市场代理 11.80 个百分点。这个实验失败了，所以只保留数值、诊断和回测产物，不加入正式多因子组合。
+
 ## 6. 回测信息时序
 
 Naive 版本严格复现题目所指出的问题：用尚未发生的次日收益计算当日 IC，因此仅作为前视偏差对照。
@@ -171,6 +222,24 @@ Naive 版本严格复现题目所指出的问题：用尚未发生的次日收�
 | 换手约束 | 22.82% | 30.04% | -18.01% | 14.73 bps |
 
 对称双边成本为 10 bps 时，两者累计收益分别为 1.30% 和 8.28%；20 bps 时分别降至 -32.35% 和 -8.49%。成本包含初始建仓、调仓及样本末全部退出；这里固定持仓路径后线性重定价，没有模拟冲击、涨跌停、成交容量或滑点，不能解释为实盘可实现收益。
+
+### 6.2 300 股日频市场代理
+
+日频因子策略的市场代理是样本内 300 只股票的当日有效收盘收益等权平均。它没有扣交易成本，也不是沪深 300 或其他外部指数。策略收益使用题目费用口径（卖出 5 bps、买入 0）并计入期末退出。
+
+| 策略 | 精确对齐期间 | 成本后收益 | 同期市场代理 | 领先百分点 |
+|---|---|---:|---:|---:|
+| 官方四因子组合 | 2025-05-07—2026-06-30 | 37.06% | 8.69% | 28.37 |
+| 换手约束四因子组合 | 2025-05-07—2026-06-30 | 22.82% | 8.69% | 14.13 |
+| 示例因子 | 2025-06-04—2026-06-30 | 10.39% | 5.67% | 4.72 |
+| 5 日动量 | 2025-05-14—2026-06-30 | -29.43% | 6.98% | -36.42 |
+| 主买主卖失衡 | 2025-05-07—2026-06-30 | -35.67% | 8.69% | -44.36 |
+| 日内振幅 | 2025-05-07—2026-06-30 | -1.79% | 8.69% | -10.48 |
+| 实验 `illiquidity_20d` | 2025-06-05—2026-06-30 | -7.32% | 4.48% | -11.80 |
+
+官方组合的期末 relative wealth 为 1.261，跟踪误差 14.83%，信息比率 1.439，相对最大回撤 -12.93%。换手约束组合的对应数字为 1.130、12.00%、0.930 和 -7.47%。两个组合的逐日跑赢比例都约为 50%，累计超额来自赢亏幅度，不是每天都领先。
+
+单因子的起始日会受温暖期影响，所以每一行都只和自己的精确同期市场代理比较。`factor_vs_market.png` 则截取所有策略的共同日期作图。逐日对齐、指标定义和历史 IC 方向分别保存在 `benchmark_periods.csv`、`benchmark_metrics.json` 和 `single_factor_history_weights.csv`。
 
 ## 7. LSTM
 
@@ -223,7 +292,61 @@ Naive 版本严格复现题目所指出的问题：用尚未发生的次日收�
 
 针对原发布包，还进行了不重训组件的验证集融合调整：以 Macro F1 优先选择时，move bias 从 -0.05 调至 -0.16，joint weight 从 0.50 调至 0.34。测试 Accuracy 为 46.97%，Macro F1 为 46.76%，但 Brier 恶化为 0.6117；与 HistGradientBoosting 的配对检验仍不显著（`p=0.770`）。这说明调整改善了类别均衡性，但没有建立 LSTM 的显著结构优势。新的 `run_lstm_full` 默认也使用 `macro_f1_then_accuracy` 作为验证集融合目标。
 
-### 7.4 概率信号到策略闭环
+### 7.4 方向+涨跌幅多任务 LSTM
+
+原来的三分类模型保持冻结；`output/lstm_return/` 是一条独立实验线。新模型使用同一个 LSTM 编码器，一个输出头预测 down/flat/up，另一个输出头预测非负的下一分钟绝对收益幅度：
+
+```text
+magnitude_target = abs(10000 × (close[t+1] / close[t] - 1))
+loss = classification_cross_entropy + lambda × SmoothL1(magnitude)
+expected_return_bps = (P(up) - P(down)) × predicted_abs_return_bps
+```
+
+特征标准化、每只股票的幅度尺度和 99.5% 截尾上限只用训练集拟合。`lambda` 候选值是 0.1/0.3/1.0，验证集最终选中 0.1；开仓阈值也由验证集选择，且不低于单边 5 bps。这些选择写入 `selection_frozen_before_test.json` 后，程序才首次加载测试日期。
+
+| 测试指标（5,900 个窗口） | 结果 | 对照 |
+|---|---:|---:|
+| 三分类 Accuracy / Macro F1 | 46.69% / 46.25% | 原三分类 46.88% / 45.87% |
+| 绝对幅度 MAE | 8.91 bps | 预测 0：9.90 bps |
+| 绝对幅度 RMSE | 12.53 bps | 预测 0：16.29 bps |
+| 绝对幅度 Pearson / Spearman | 0.303 / 0.253 | — |
+| 有符号预期收益 MAE / RMSE | 10.15 / 15.77 bps | 预测 0：9.90 / 16.29 bps |
+| 有符号预期收益 Pearson IC / Spearman IC | 0.288 / 0.331 | — |
+| 非平价方向命中率 | 68.04% | — |
+
+预测收益十分组的实现收益基本单调，组序 Spearman 为 0.988，顶组与底组相差 15.05 bps。但有符号预期收益的 MAE 比“永远预测 0”更差 0.25 bps，不能只报相关性。它目前有排序信息，点预测精度仍然很有限。
+
+### 7.5 收益率回归基线与统一策略比较
+
+Ridge 和 `HistGradientBoostingRegressor` 使用与幅度 LSTM 相同的 5 只股票、60 分钟增强窗口和日期切分。每个序列固定汇总为 180 维；缺失处理、Ridge 标准化和两个回归器只拟合训练集。超参数和开仓阈值只看验证集，冻结后各模型只评价一次测试集。
+
+| 回归模型 | MAE | RMSE | Pearson | Spearman | 验证集冻结阈值 |
+|---|---:|---:|---:|---:|---:|
+| Ridge | 10.50 bps | 15.76 bps | 0.254 | 0.297 | 7.845 bps |
+| HistGradientBoostingRegressor | 10.49 bps | 15.64 bps | 0.281 | 0.318 | 7.677 bps |
+| 预测 0 基线 | 9.90 bps | 16.29 bps | — | — | — |
+
+两个回归器的 RMSE 好于预测 0，MAE 却更差。这和幅度 LSTM 的结论类似：它们能排序部分大波动，但还不是准确的收益率预报器。
+
+`run_lstm_strategy_comparison` 强制所有模型使用完全相同的 5,900 个股票-分钟键、1,180 个一分钟区间、10 个交易日和实现收益。概率模型使用 `P(up)-P(down)`，flat 为最大概率时不交易，本表不另加概率阈值；收益率模型使用验证集已冻结的 bps 阈值。所有仓位都进入同一个成本引擎，下表是单边 5 bps 的 10 日净收益。
+
+| 模型/代理 | 信号 | long-short 覆盖 | long-short 净收益 | 日均换手 | long-only 覆盖 | long-only 净收益 | 日均换手 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 原 LSTM | 概率差 | 56.25% | -13.27% | 165.16 | 23.32% | -9.03% | 129.51 |
+| 三分类 HistGB | 概率差 | 59.97% | -20.18% | 170.41 | 24.71% | -16.51% | 137.49 |
+| LSTM+HistGB hybrid | 概率差 | 57.98% | -16.81% | 167.00 | 23.76% | -11.22% | 132.62 |
+| 幅度 LSTM | 预期收益，5.000 bps | 3.10% | 3.92% | 32.10 | 1.34% | 4.06% | 14.60 |
+| Ridge | 预期收益，7.845 bps | 5.25% | -3.38% | 51.59 | 3.00% | 3.06% | 31.62 |
+| HistGBRegressor | 预期收益，7.677 bps | 6.00% | 3.19% | 60.28 | 3.05% | 1.22% | 32.56 |
+| 5 股分钟等权代理 | 每分钟等权 | 100.00% | -1.58% | 4.00 | 100.00% | -1.58% | 4.00 |
+
+5 股分钟等权代理在不扣成本时收益为 0.41%，它是相对收益的主基准；表中 -1.58% 是该代理每分钟重新等权后再扣 5 bps 的诊断值。另一条“仅在观测分钟区间持有”的 5 股等权代理只计入场和退出，成本后收益为 0.21%。
+
+这里的 5 股代理只覆盖模型测试使用的股票和一分钟区间，不是第 6.2 节的 300 股日频市场代理，更不是大盘指数。幅度 LSTM 的 long-short/long-only 净收益相对这条不扣成本的分钟代理分别为 3.50%/3.63%。
+
+统一表比较的是已冻结交易规则的经济结果，不是纯粹的模型结构消融：概率模型用 0 阈值，收益率模型用验证集阈值。固定 10 日测试段已被多次查看，并且回测没有冲击、成交失败和融券费。因此 3.92% 和 4.06% 只是这 10 日的诊断，不是长期收益结论。
+
+### 7.6 概率信号到策略闭环
 
 `run_lstm_strategy` 用预测时可见的 `P(up)-P(down)` 和验证集冻结档位生成仓位，按股票横截面归一化后，精确连接 `window_end → target_time` 的下一分钟收益；真实标签和收益只用于事后评价。组合先在同一分钟跨股票聚合，再沿时间复利，换手包含入场、调仓、数据间断平仓和最终退出。
 
@@ -242,13 +365,13 @@ Naive 版本严格复现题目所指出的问题：用尚未发生的次日收�
 
 更好的分类分数不必然带来更好的策略：hybrid 的 strict 置信加权 long-short/long-only 在同一单边 5 bps 口径下仅为 0.09%/1.70%，低于原 LSTM 的 5.67%/2.54%。因此最终选择模型必须同时看概率质量、换手和成本后收益，不能只按 Accuracy 排名。
 
-### 7.5 Walk-forward 与单折重训边界
+### 7.7 Walk-forward 与单折重训边界
 
 项目已按“180 个训练日 + 10 个验证日 + 10 个测试日、步长 10 日”的扩展窗口生成 11 折协议。每一折都必须独立重训标准化、三个组件、融合参数和置信阈值，静态模型按日期切片不算 walk-forward。
 
 目前只完成第 1 折严格重训示范：训练 2025-04-01—2025-12-23，验证 2025-12-24—2026-01-08，测试 2026-01-09—2026-01-22。该折 5,900 个测试窗口的 Accuracy 为 54.46%、Macro F1 为 46.54%、Brier 为 0.5421、NLL 为 0.8930，多数类基线为 46.95%。这证明协议可以实际执行，不证明跨时期稳定；其余 10 折尚未独立训练，而且相关历史日期在此前研究中可能已经被研究者接触。
 
-### 7.6 复现与审计
+### 7.8 复现与审计
 
 新训练默认写入 `output/lstm_runs/<target_mode>/`；若目录非空会拒绝覆盖，只有显式传入 `--overwrite` 才会替换。复训已发布的条件二分类配置时，建议写入新目录：
 
@@ -272,10 +395,10 @@ python -m scripts.run_lstm \
 output/
 ├── daily/                 # 11 张日频表
 ├── minute/                # 11 × 302 张分钟表
-├── factors/               # 因子、每日 IC、分层结果、图表、自动报告
+├── factors/               # 官方四因子与单独保存的实验因子数值
 ├── factor_robustness/     # 滚动/分段 IC、bootstrap、状态与方向漂移
 ├── backtest/              # 净值、收益、换手、选股、指标、图表、自动报告
-├── backtest_robustness/   # 换手约束、固定持仓成本压力与盈亏平衡成本
+├── backtest_robustness/   # 换手/成本、300 股代理、单因子经济评价与实验因子
 ├── lstm/                  # 非平价条件方向模型及逐样本结果
 ├── lstm_full/             # 全窗口三组件模型、选择性预测档位及逐样本结果
 ├── lstm_baselines/        # Logistic/HistGradientBoosting 强基线
@@ -286,8 +409,19 @@ output/
 ├── lstm_strategy_long_only/ # long-only 概率策略与成本压力
 ├── lstm_hybrid_strategy/  # hybrid long-short 策略诊断
 ├── lstm_hybrid_strategy_long_only/ # hybrid long-only 策略诊断
+├── lstm_return/           # 方向+幅度 LSTM、冻结阈值、回放审计与策略
+├── lstm_return_baselines/ # Ridge/HistGBRegressor、冻结阈值与成本曲线
+├── lstm_strategy_comparison_full/ # 同样本 long-short 统一比较
+├── lstm_strategy_comparison_full_long_only/ # 同样本 long-only 统一比较
 ├── lstm_walk_forward/     # 已独立重训的折及 OOS 聚合
 └── validation_report.json # 全工程严格验收结果
 ```
+
+| 目录 | 主要可审计产物 |
+|---|---|
+| `backtest_robustness/` | `benchmark_periods.csv`、`benchmark_metrics.json`、`factor_vs_market.png`、`single_factor_market_metrics.csv`、`single_factor_history_weights.csv`、`illiquidity_20d.csv` |
+| `lstm_return/` | `selection_frozen_before_test.json`、`model.pt`、`lambda_selection.csv`、`validation_threshold_selection.csv`、`test_predictions.csv`、`test_metrics.json`、`replay_audit.json`、`strategy_comparison.csv` |
+| `lstm_return_baselines/` | `models.joblib`、`validation_selection.csv`、`validation_threshold_selection.csv`、`ridge_test_predictions.csv`、`hist_gradient_boosting_regressor_test_predictions.csv`、`test_metrics.json`、`replay_audit.json`、`strategy_cost_sensitivity.csv` |
+| `lstm_strategy_comparison_full*/` | `aligned_sample_returns.csv`、`strategy_comparison.csv`、`wealth_curves.csv`、`metrics.json`、`strategy_comparison.png`；`portfolio_paths/` 保存每个模型和代理的逐分钟路径 |
 
 所有研究报告由对应脚本根据当前数据自动生成，避免手工报告与产物不一致。
