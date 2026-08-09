@@ -408,6 +408,177 @@ def validate_lstm_full(output_dir: Path) -> dict:
     }
 
 
+def _validate_standard_probability_artifact(
+    root: Path,
+    reported_accuracy: float,
+) -> dict:
+    predictions = pd.read_csv(root / "test_predictions.csv")
+    probability_columns = ["prob_down", "prob_flat", "prob_up"]
+    required = {"true_label", "predicted_label", *probability_columns}
+    if not required.issubset(predictions.columns):
+        raise AssertionError(f"probability artifact is incomplete: {root}")
+    probability = predictions[probability_columns].to_numpy(dtype=float)
+    if not np.isfinite(probability).all() or not np.allclose(
+        probability.sum(axis=1), 1.0, atol=1e-6
+    ):
+        raise AssertionError(f"invalid saved probabilities: {root}")
+    if not np.array_equal(
+        probability.argmax(axis=1), predictions["predicted_label"].to_numpy()
+    ):
+        raise AssertionError(f"saved labels do not match probabilities: {root}")
+    observed = float(
+        (predictions["true_label"] == predictions["predicted_label"]).mean()
+    )
+    if not np.isclose(observed, reported_accuracy, atol=1e-12):
+        raise AssertionError(f"reported accuracy differs from predictions: {root}")
+    return {"n": int(len(predictions)), "accuracy": observed}
+
+
+def validate_research_enhancements(output_dir: Path) -> dict:
+    """Validate optional robustness/model artifacts when they are present."""
+
+    report: dict[str, dict] = {}
+
+    factor_root = output_dir / "factor_robustness"
+    if factor_root.exists():
+        bootstrap = pd.read_csv(factor_root / "ic_bootstrap_ci.csv")
+        if set(bootstrap["factor"]) != set(FACTOR_NAMES):
+            raise AssertionError("factor robustness bootstrap set differs")
+        if not (
+            np.isfinite(
+                bootstrap[["mean_ic", "ci_lower", "ci_upper"]].to_numpy(float)
+            ).all()
+            and (bootstrap["ci_lower"] <= bootstrap["mean_ic"]).all()
+            and (bootstrap["mean_ic"] <= bootstrap["ci_upper"]).all()
+        ):
+            raise AssertionError("factor robustness confidence intervals are invalid")
+        manifest = json.loads(
+            (factor_root / "analysis_manifest.json").read_text(encoding="utf-8")
+        )
+        neutralization = manifest.get("neutralization", {})
+        if neutralization.get("status") not in {"completed", "skipped"}:
+            raise AssertionError("factor neutralization status is not explicit")
+        report["factor_robustness"] = {
+            "factors": int(len(bootstrap)),
+            "neutralization": neutralization.get("status"),
+        }
+
+    backtest_root = output_dir / "backtest_robustness"
+    if backtest_root.exists():
+        stress = pd.read_csv(backtest_root / "cost_stress.csv")
+        if not stress["one_way_cost_bps"].is_monotonic_increasing:
+            raise AssertionError("backtest cost grid is not increasing")
+        if (stress["total_return"].diff().dropna() > 1e-12).any():
+            raise AssertionError("backtest net return increases with transaction cost")
+        summary = json.loads((backtest_root / "summary.json").read_text(encoding="utf-8"))
+        break_even = float(summary["symmetric_break_even_one_way_bps"])
+        if not np.isfinite(break_even) or break_even < 0.0:
+            raise AssertionError("backtest break-even cost is invalid")
+        report["backtest_robustness"] = {
+            "cost_scenarios": int(len(stress)),
+            "break_even_one_way_bps": break_even,
+        }
+
+    baseline_root = output_dir / "lstm_baselines"
+    if baseline_root.exists():
+        metrics = json.loads(
+            (baseline_root / "test_metrics.json").read_text(encoding="utf-8")
+        )
+        predictions = pd.read_csv(baseline_root / "test_predictions.csv")
+        for prefix, name in (
+            ("logistic", "logistic_regression"),
+            ("hist_tree", "hist_gradient_boosting"),
+        ):
+            probability = predictions[
+                [f"{prefix}_prob_down", f"{prefix}_prob_flat", f"{prefix}_prob_up"]
+            ].to_numpy(float)
+            if not np.allclose(probability.sum(axis=1), 1.0, atol=1e-6):
+                raise AssertionError(f"{name} probabilities do not sum to one")
+            observed = float(
+                (probability.argmax(axis=1) == predictions["true_label"]).mean()
+            )
+            expected = float(metrics["models"][name]["test"]["accuracy"])
+            if not np.isclose(observed, expected, atol=1e-12):
+                raise AssertionError(f"{name} prediction accuracy differs")
+        audit = metrics["audit"]
+        if not audit.get("test_loaded_after_selection_frozen"):
+            raise AssertionError("baseline test was not loaded after frozen selection")
+        report["lstm_baselines"] = {"n": int(len(predictions)), "models": 2}
+
+    adjusted_root = output_dir / "lstm_adjusted"
+    if adjusted_root.exists():
+        metrics = json.loads(
+            (adjusted_root / "test_metrics.json").read_text(encoding="utf-8")
+        )
+        values = _validate_standard_probability_artifact(
+            adjusted_root, float(metrics["accuracy"])
+        )
+        frozen = json.loads(
+            (adjusted_root / "selection_frozen_before_test.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if int(frozen.get("test_evaluation_count", -1)) != 1:
+            raise AssertionError("adjusted LSTM test evaluation count differs")
+        report["lstm_adjusted"] = values
+
+    hybrid_root = output_dir / "lstm_hybrid"
+    if hybrid_root.exists():
+        metrics = json.loads(
+            (hybrid_root / "test_metrics.json").read_text(encoding="utf-8")
+        )
+        values = _validate_standard_probability_artifact(
+            hybrid_root, float(metrics["hybrid"]["accuracy"])
+        )
+        selection = metrics["selection"]
+        if not np.isclose(
+            float(selection["lstm_weight"]) + float(selection["tree_weight"]), 1.0
+        ):
+            raise AssertionError("hybrid model weights do not sum to one")
+        if not metrics["audit"].get("test_loaded_after_selection_frozen"):
+            raise AssertionError("hybrid test was not loaded after frozen selection")
+        report["lstm_hybrid"] = values
+
+    research_root = output_dir / "lstm_research"
+    if research_root.exists():
+        metrics = json.loads(
+            (research_root / "research_metrics.json").read_text(encoding="utf-8")
+        )
+        folds = pd.read_csv(research_root / "walk_forward_manifest.csv")
+        if len(folds) != len(folds["fold"].unique()) or len(folds) == 0:
+            raise AssertionError("walk-forward manifest fold identifiers are invalid")
+        if not metrics["methodology"].get("date_stability_is_not_walk_forward"):
+            raise AssertionError("static date slicing is mislabeled as walk-forward")
+        report["lstm_research"] = {"planned_walk_forward_folds": int(len(folds))}
+
+    for directory in (
+        "lstm_strategy",
+        "lstm_strategy_long_only",
+        "lstm_hybrid_strategy",
+        "lstm_hybrid_strategy_long_only",
+    ):
+        strategy_root = output_dir / directory
+        if not strategy_root.exists():
+            continue
+        metrics = json.loads(
+            (strategy_root / "metrics.json").read_text(encoding="utf-8")
+        )
+        if not np.isclose(
+            float(metrics["label_return_alignment_audit"]["agreement"]), 1.0
+        ):
+            raise AssertionError(f"strategy return labels are misaligned: {directory}")
+        sensitivity = pd.read_csv(strategy_root / "cost_sensitivity.csv")
+        for _, group in sensitivity.groupby("strategy"):
+            ordered = group.sort_values("cost_bps")
+            if (ordered["net_total_return"].diff().dropna() > 1e-12).any():
+                raise AssertionError(f"strategy return increases with cost: {directory}")
+        report[directory] = {
+            "strategies": int(sensitivity["strategy"].nunique()),
+            "test_days": int(sensitivity["n_days"].iloc[0]),
+        }
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
@@ -424,6 +595,7 @@ def main() -> None:
         "backtest": validate_backtest(args.output_dir),
         "lstm": validate_lstm(args.output_dir),
         "lstm_full": validate_lstm_full(args.output_dir),
+        "research_enhancements": validate_research_enhancements(args.output_dir),
     }
     target = args.output_dir / "validation_report.json"
     target.write_text(json.dumps(report, indent=2), encoding="utf-8")

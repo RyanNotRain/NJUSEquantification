@@ -13,6 +13,7 @@ dependencies = [
   "scipy>=1.12",
   "matplotlib>=3.8",
   "scikit-learn>=1.4",
+  "joblib>=1.3",
   "torch>=2.2",
 ]
 
@@ -23,6 +24,13 @@ qd-backtest = "scripts.run_backtest:main"
 qd-lstm = "scripts.run_lstm:main"
 qd-lstm-full = "scripts.run_lstm_full:main"
 qd-lstm-full-eval = "scripts.evaluate_lstm_full:main"
+qd-factor-robustness = "scripts.run_factor_robustness:main"
+qd-backtest-robustness = "scripts.run_backtest_robustness:main"
+qd-lstm-research = "scripts.run_lstm_research:main"
+qd-lstm-strategy = "scripts.run_lstm_strategy:main"
+qd-lstm-baselines = "scripts.run_lstm_baselines:main"
+qd-lstm-adjust = "scripts.adjust_lstm_fusion:main"
+qd-lstm-hybrid = "scripts.run_lstm_hybrid:main"
 
 [tool.setuptools]
 packages = ["qd", "scripts"]

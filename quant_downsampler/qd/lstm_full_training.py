@@ -426,7 +426,10 @@ def _select_fusion(
     joint_probability: np.ndarray,
     move_biases: np.ndarray,
     joint_weights: np.ndarray,
+    objective: str = "macro_f1_then_accuracy",
 ) -> tuple[dict, np.ndarray]:
+    if objective not in {"macro_f1_then_accuracy", "accuracy_then_macro_f1"}:
+        raise ValueError("unknown fusion objective")
     best_score: tuple[float, float, float, float] | None = None
     best: dict | None = None
     best_probability: np.ndarray | None = None
@@ -439,15 +442,20 @@ def _select_fusion(
                 joint_probability, staged, float(joint_weight)
             )
             metrics = classification_metrics(labels, probability, threshold=None)
+            primary = (
+                (float(metrics["f1"]), float(metrics["accuracy"]))
+                if objective == "macro_f1_then_accuracy"
+                else (float(metrics["accuracy"]), float(metrics["f1"]))
+            )
             score = (
-                float(metrics["accuracy"]),
-                float(metrics["f1"]),
+                *primary,
                 -abs(float(joint_weight) - 0.5),
                 -abs(float(move_bias)),
             )
             if best_score is None or score > best_score:
                 best_score = score
                 best = {
+                    "objective": objective,
                     "move_bias": float(move_bias),
                     "joint_weight": float(joint_weight),
                     "two_stage_weight": float(1.0 - joint_weight),
@@ -582,6 +590,7 @@ def run_full_training(
     move_bias_max: float = 0.30,
     move_bias_step: float = 0.05,
     joint_weight_step: float = 0.05,
+    fusion_objective: str = "macro_f1_then_accuracy",
     balanced_quantile: float = 0.70,
     strict_quantile: float = 0.90,
     overwrite: bool = False,
@@ -597,6 +606,10 @@ def run_full_training(
         raise ValueError("dropout and label_smoothing must be within [0, 1)")
     if not 0.0 < balanced_quantile < strict_quantile < 1.0:
         raise ValueError("require 0 < balanced_quantile < strict_quantile < 1")
+    if fusion_objective not in {
+        "macro_f1_then_accuracy", "accuracy_then_macro_f1"
+    }:
+        raise ValueError("unknown fusion_objective")
     ranges = dict(splits or DEFAULT_SPLITS)
     _validate_splits(ranges)
     minute_dir = Path(data_dir or (OUTPUT_DIR / "minute"))
@@ -721,7 +734,7 @@ def run_full_training(
     fusion, validation_probability = _select_fusion(
         joint_data["val_labels"], direction_full_val_probability,
         movement_val_probability, joint_val_probability,
-        move_biases, joint_weights,
+        move_biases, joint_weights, fusion_objective,
     )
     val_confidence = validation_probability.max(axis=1)
     selective_thresholds = {
@@ -896,7 +909,7 @@ def run_full_training(
         "two_stage_weight": fusion["two_stage_weight"],
         "selective_thresholds": selective_thresholds,
         "fusion_selection": {
-            "objective": "validation_accuracy_then_macro_f1",
+            "objective": f"validation_{fusion_objective}",
             "move_bias_grid": move_biases.tolist(),
             "joint_weight_grid": joint_weights.tolist(),
             "validation_accuracy": fusion["validation_accuracy"],

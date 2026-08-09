@@ -66,6 +66,12 @@ def main() -> None:
     parser.add_argument("--move-bias-max", type=float, default=0.30)
     parser.add_argument("--move-bias-step", type=float, default=0.05)
     parser.add_argument("--joint-weight-step", type=float, default=0.05)
+    parser.add_argument(
+        "--fusion-objective",
+        choices=("macro_f1_then_accuracy", "accuracy_then_macro_f1"),
+        default="macro_f1_then_accuracy",
+        help="validation-only objective used to freeze move bias and fusion weight",
+    )
     parser.add_argument("--balanced-quantile", type=float, default=0.70)
     parser.add_argument("--strict-quantile", type=float, default=0.90)
     args = parser.parse_args()
@@ -102,6 +108,7 @@ def main() -> None:
         move_bias_max=args.move_bias_max,
         move_bias_step=args.move_bias_step,
         joint_weight_step=args.joint_weight_step,
+        fusion_objective=args.fusion_objective,
         balanced_quantile=args.balanced_quantile,
         strict_quantile=args.strict_quantile,
         overwrite=args.overwrite,
