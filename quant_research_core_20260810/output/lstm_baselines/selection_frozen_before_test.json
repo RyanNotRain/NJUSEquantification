@@ -1,0 +1,41 @@
+{
+  "status": "frozen_before_test",
+  "selected": {
+    "hist_gradient_boosting": {
+      "family": "hist_gradient_boosting",
+      "parameter": 31.0,
+      "model_key": "hist_gradient_boosting::31",
+      "accuracy": 0.44899845916795067,
+      "macro_f1": 0.4436682261890356,
+      "brier": 0.6219688337436127,
+      "nll": 1.0198429421167454,
+      "top_label_ece": 0.05290001152346922
+    },
+    "linear_logistic_sgd": {
+      "family": "linear_logistic_sgd",
+      "parameter": 0.0001,
+      "model_key": "linear_logistic_sgd::0.0001",
+      "accuracy": 0.4519260400616333,
+      "macro_f1": 0.44062064928119593,
+      "brier": 0.6420958167802547,
+      "nll": 1.0649841032391494,
+      "top_label_ece": 0.09057125075380021
+    }
+  },
+  "lstm_temperature": 1.3,
+  "selection_objective": "validation macro F1, then accuracy; calibration uses validation NLL",
+  "splits": {
+    "train": [
+      "20250401",
+      "20260531"
+    ],
+    "val": [
+      "20260601",
+      "20260615"
+    ],
+    "test": [
+      "20260616",
+      "20260630"
+    ]
+  }
+}

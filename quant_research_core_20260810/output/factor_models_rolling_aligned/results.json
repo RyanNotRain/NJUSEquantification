@@ -1,0 +1,46 @@
+{
+  "settings": {
+    "train_window_days": 120,
+    "rebalance_days": 20,
+    "epochs_per_refit": 300,
+    "cost_bps": 5.0
+  },
+  "models": {
+    "return_regression": {
+      "full_walk_forward": {
+        "annualized_sharpe_net": 4.847728143177304,
+        "mean_daily_net_bp": 17.50203514099121,
+        "daily_volatility_bp": 57.312660217285156,
+        "average_turnover": 0.24813351035118103,
+        "annualized_return_net": 0.5473823547363281,
+        "max_drawdown": -0.08376127481460571
+      },
+      "last_45_days": {
+        "annualized_sharpe_net": -3.2497971654088476,
+        "mean_daily_net_bp": -14.754118919372559,
+        "daily_volatility_bp": 72.07046508789062,
+        "average_turnover": 0.2143581211566925,
+        "annualized_return_net": -0.3150906562805176,
+        "max_drawdown": -0.07871484756469727
+      }
+    },
+    "direct_sharpe": {
+      "full_walk_forward": {
+        "annualized_sharpe_net": 4.5774122298530315,
+        "mean_daily_net_bp": 10.73424243927002,
+        "daily_volatility_bp": 37.2264518737793,
+        "average_turnover": 0.23654705286026,
+        "annualized_return_net": 0.30816423892974854,
+        "max_drawdown": -0.054278671741485596
+      },
+      "last_45_days": {
+        "annualized_sharpe_net": -3.759489381294616,
+        "mean_daily_net_bp": -11.070032119750977,
+        "daily_volatility_bp": 46.7433967590332,
+        "average_turnover": 0.1923169046640396,
+        "annualized_return_net": -0.24558544158935547,
+        "max_drawdown": -0.05427873134613037
+      }
+    }
+  }
+}

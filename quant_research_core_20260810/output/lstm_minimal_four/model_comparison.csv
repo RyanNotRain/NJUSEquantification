@@ -1,0 +1,4 @@
+horizon,model,threshold_bps,top_k,interval_minutes,periods,active_periods,coverage,gross_total_return,net_total_return,matched_market_total_return,excess_vs_matched_market,mean_selected_names,input_feature_count,classification_accuracy,classification_macro_f1,return_spearman_ic
+t1_same_minute_open,all_25,0.0000000000,1,60,9,27,1.0000000000,-0.1876406724,-0.1913748464,-0.1202662582,-0.0808296702,1.0000000000,25,0.4589453861,0.4437692312,-0.0170062835
+t1_same_minute_open,cluster_pruned_19,52.0601264954,2,30,9,37,0.8222222222,-0.0877161568,-0.0911198538,-0.0849775095,-0.0067127796,1.5405405405,19,0.4613935970,0.4572231571,0.0648568931
+t1_same_minute_open,prompt_raw_four,19.0982036591,1,60,9,24,0.8888888889,-0.1229158238,-0.1264677883,-0.1050212887,-0.0239631394,1.0000000000,4,0.4553672316,0.3964434321,-0.1208928910

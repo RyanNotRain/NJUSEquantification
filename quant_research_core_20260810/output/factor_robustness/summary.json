@@ -1,0 +1,31 @@
+{
+  "status": "completed",
+  "factor_count": 10,
+  "date_start": "2025-04-01",
+  "date_end": "2026-06-30",
+  "latest_quarter": "2026Q2",
+  "latest_quarter_positive_factor_count": 9,
+  "bootstrap_significant_factor_count": 10,
+  "neutralization": "skipped: no genuine market-cap or industry exposure tables are supplied",
+  "market_regime_note": "target_market_direction is ex-post diagnostic only; known_market_trend uses trailing data. A common market move does not mechanically change cross-sectional IC.",
+  "best_single_factor_by_excess": {
+    "factor": "volume_price_corr_20d",
+    "first_execution_date": "2025-05-21 00:00:00",
+    "strategy_total_return": 0.16954552635439613,
+    "market_total_return": 0.049653816977996756,
+    "geometric_excess_return": 0.11422023855595875,
+    "information_ratio": 0.8123385488267872,
+    "beta": 0.6969349485366501,
+    "annualized_arithmetic_alpha": 0.11717893113683839
+  },
+  "worst_single_factor_by_excess": {
+    "factor": "momentum_5d",
+    "first_execution_date": "2025-05-14 00:00:00",
+    "strategy_total_return": -0.29666089172008836,
+    "market_total_return": 0.06984360594666272,
+    "geometric_excess_return": -0.3425776399742517,
+    "information_ratio": -2.4560879051205218,
+    "beta": 1.012958284385421,
+    "annualized_arithmetic_alpha": -0.3731958736723909
+  }
+}

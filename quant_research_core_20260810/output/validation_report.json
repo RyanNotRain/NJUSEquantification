@@ -1,0 +1,277 @@
+{
+  "status": "passed",
+  "checks": {
+    "task1_daily": {
+      "status": "passed",
+      "shapes": {
+        "open": [
+          302,
+          300
+        ],
+        "high": [
+          302,
+          300
+        ],
+        "low": [
+          302,
+          300
+        ],
+        "close": [
+          302,
+          300
+        ],
+        "volume": [
+          302,
+          300
+        ],
+        "trade_count": [
+          302,
+          300
+        ],
+        "amount": [
+          302,
+          300
+        ],
+        "buy_volume": [
+          302,
+          300
+        ],
+        "sell_volume": [
+          302,
+          300
+        ],
+        "buy_amount": [
+          302,
+          300
+        ],
+        "sell_amount": [
+          302,
+          300
+        ]
+      }
+    },
+    "task1_minute": {
+      "status": "passed",
+      "channels": {
+        "open": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "high": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "low": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "close": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "volume": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "trade_count": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "amount": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "buy_volume": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "sell_volume": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "buy_amount": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        },
+        "sell_amount": {
+          "files": 302,
+          "first": "20250401",
+          "last": "20260630",
+          "sample_shape": [
+            242,
+            300
+          ]
+        }
+      }
+    },
+    "tasks2_3": {
+      "status": "passed",
+      "factor_count": 10,
+      "ir_definition": "sqrt(252) * ICIR",
+      "robustness": {
+        "bootstrap_factor_count": 10,
+        "latest_quarter": "2026Q2",
+        "latest_quarter_positive_factor_count": 9,
+        "single_factor_market_rows": 10
+      }
+    },
+    "task4": {
+      "status": "passed",
+      "strategy_count": 10,
+      "best_strict_by_sharpe": "adaptive_close",
+      "benchmark_analysis": {
+        "full_excess_return": 0.07822059951102034,
+        "post_warmup_excess_return": 0.06153212228114646,
+        "last_45_day_excess_return": -0.016675319938122546
+      },
+      "turnover_cost_robustness": {
+        "rows": 8,
+        "buffered_5bp_total_return": 0.1668354779
+      },
+      "factor_independence": {
+        "calibration_days": 120,
+        "cluster_count": 6,
+        "selected_factors": [
+          "example_factor",
+          "momentum_10d",
+          "volatility_10d",
+          "buy_sell_imbalance",
+          "intraday_range",
+          "volume_price_corr_20d"
+        ],
+        "raw_max_abs_correlation": 0.8367767389,
+        "pruned_max_abs_correlation": 0.5974312074,
+        "orthogonalized_max_abs_correlation": 0.0961981921,
+        "best_post_freeze_by_geometric_excess": {
+          "factor_set": "cluster_pruned",
+          "strategy_total_return": 0.13719060214649992,
+          "market_total_return": -0.07299362536581144,
+          "geometric_excess_return": 0.2267343928408836
+        }
+      }
+    },
+    "task5": {
+      "status": "passed",
+      "test_windows": 5900,
+      "accuracy": 0.4645762711864407,
+      "balanced_accuracy": 0.46178929471976393,
+      "macro_f1": 0.4593136172123016,
+      "strict_replay": true,
+      "strategy_analysis": {
+        "timing": "next_minute_open_to_close",
+        "five_stock_market_total_return": 0.05123221338623596,
+        "strict_up_net_return_5bp": -0.050256161,
+        "balanced_up_t1_excess_vs_matched_market_5bp": 0.003561513
+      },
+      "strong_baselines_and_calibration": {
+        "models": [
+          "hist_gradient_boosting",
+          "last_observed_move",
+          "linear_logistic_sgd",
+          "lstm_ensemble_raw",
+          "lstm_ensemble_temperature_scaled",
+          "majority_flat"
+        ],
+        "raw_lstm_ece": 0.0270655155,
+        "temperature_scaled_lstm_ece": 0.0091143041,
+        "same_key_strategy_rows": 18
+      },
+      "magnitude_aware_experiment": {
+        "test_rows": 5900,
+        "test_return_spearman_ic": 0.3345677727968623,
+        "strategy_rows": 9,
+        "same_test_keys_as_official_lstm": true
+      },
+      "tradable_return_horizons": {
+        "horizons": [
+          "open_to_close_15m",
+          "open_to_close_1m",
+          "open_to_close_30m",
+          "open_to_close_5m",
+          "t1_same_minute_open"
+        ],
+        "models": [
+          "hist_gradient_boosting_regressor",
+          "ridge"
+        ],
+        "test_metric_rows": 10,
+        "ridge_t1_excess_vs_matched_market": 0.0069375777,
+        "compact_t1_lstm_return_spearman_ic": -0.017006283539756282,
+        "compact_t1_lstm_excess_vs_matched_market": -0.0808296701993032
+      },
+      "feature_and_component_independence": {
+        "selection_split": "train",
+        "original_feature_count": 25,
+        "selected_feature_count": 19,
+        "all_feature_max_abs_correlation": 0.9999976858,
+        "selected_feature_max_abs_correlation": 0.8338572888,
+        "pruned_lstm_test_accuracy": 0.4613935969868173,
+        "pruned_lstm_return_spearman_ic": 0.06485689308654677,
+        "pruned_lstm_excess_vs_matched_market": -0.006712779578948891,
+        "validation_joint_staged_agreement": 0.8195685670261942
+      },
+      "prompt_raw_four_baseline": {
+        "field_mapping": {
+          "Time": "session_progress",
+          "Price": "close_log_return",
+          "Volume": "log1p_volume",
+          "BSFlag": "buy_volume_imbalance"
+        },
+        "test_accuracy": 0.4553672316384181,
+        "test_macro_f1": 0.3964434320718156,
+        "return_spearman_ic": -0.1208928909563315,
+        "excess_vs_matched_market": -0.02396313937179584
+      }
+    }
+  }
+}

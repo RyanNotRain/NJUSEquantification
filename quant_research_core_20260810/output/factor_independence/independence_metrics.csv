@@ -1,0 +1,4 @@
+factor_set,factor_count,mean_abs_off_diagonal_correlation,max_abs_off_diagonal_correlation,pairs_abs_correlation_ge_0_60,effective_rank,condition_number
+raw_10,10,0.2879792188,0.8367767389,6,6.3253996665,32.4295405476
+cluster_pruned,6,0.2291164383,0.5974312074,0,5.0307230865,6.5590563117
+orthogonalized_10,10,0.0202654724,0.0961981921,0,9.9555068679,1.3856646703

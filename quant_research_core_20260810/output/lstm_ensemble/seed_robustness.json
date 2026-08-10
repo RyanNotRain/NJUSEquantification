@@ -1,0 +1,114 @@
+{
+  "runs": [
+    {
+      "run": "lstm_ensemble",
+      "seed": 42,
+      "accuracy": 0.4645762711864407,
+      "balanced_accuracy": 0.46178929471976393,
+      "macro_f1": 0.4593136172123016,
+      "balanced_tier_accuracy": 0.5444444444444444,
+      "balanced_tier_coverage": 0.3050847457627119,
+      "strict_tier_accuracy": 0.6256499133448874,
+      "strict_tier_coverage": 0.09779661016949152,
+      "move_bias": -0.3,
+      "joint_weight": 0.30000000000000004
+    },
+    {
+      "run": "lstm_ensemble_seed43",
+      "seed": 43,
+      "accuracy": 0.468135593220339,
+      "balanced_accuracy": 0.44989203878024125,
+      "macro_f1": 0.4513619282715238,
+      "balanced_tier_accuracy": 0.5663562281722934,
+      "balanced_tier_coverage": 0.2911864406779661,
+      "strict_tier_accuracy": 0.6332046332046332,
+      "strict_tier_coverage": 0.08779661016949153,
+      "move_bias": 0.15000000000000002,
+      "joint_weight": 0.9500000000000001
+    },
+    {
+      "run": "lstm_ensemble_seed44",
+      "seed": 44,
+      "accuracy": 0.47338983050847455,
+      "balanced_accuracy": 0.4580742390301497,
+      "macro_f1": 0.4596384340966686,
+      "balanced_tier_accuracy": 0.5683494044242768,
+      "balanced_tier_coverage": 0.2988135593220339,
+      "strict_tier_accuracy": 0.6330275229357798,
+      "strict_tier_coverage": 0.0923728813559322,
+      "move_bias": -0.14999999999999997,
+      "joint_weight": 0.8500000000000001
+    }
+  ],
+  "aggregate": {
+    "accuracy": {
+      "mean": 0.46870056497175144,
+      "sample_std": 0.0044338585668323984,
+      "min": 0.4645762711864407,
+      "max": 0.47338983050847455
+    },
+    "balanced_accuracy": {
+      "mean": 0.45658519084338495,
+      "sample_std": 0.00608679908486451,
+      "min": 0.44989203878024125,
+      "max": 0.46178929471976393
+    },
+    "macro_f1": {
+      "mean": 0.45677132652683133,
+      "sample_std": 0.004687490652309122,
+      "min": 0.4513619282715238,
+      "max": 0.4596384340966686
+    },
+    "balanced_tier_accuracy": {
+      "mean": 0.5597166923470048,
+      "sample_std": 0.013263647872693799,
+      "min": 0.5444444444444444,
+      "max": 0.5683494044242768
+    },
+    "balanced_tier_coverage": {
+      "mean": 0.29836158192090395,
+      "sample_std": 0.0069601676513943705,
+      "min": 0.2911864406779661,
+      "max": 0.3050847457627119
+    },
+    "strict_tier_accuracy": {
+      "mean": 0.6306273564951002,
+      "sample_std": 0.004311501739189371,
+      "min": 0.6256499133448874,
+      "max": 0.6332046332046332
+    },
+    "strict_tier_coverage": {
+      "mean": 0.09265536723163842,
+      "sample_std": 0.005005981292661821,
+      "min": 0.08779661016949153,
+      "max": 0.09779661016949152
+    }
+  },
+  "formal_model_rule": "seed 42 is retained because it was fixed before test comparison",
+  "comparison": [
+    {
+      "model": "direct_three_class",
+      "accuracy": 0.45559322033898303,
+      "balanced_accuracy": 0.46905354718774533,
+      "macro_f1": 0.45561445029698305,
+      "accuracy_std": 0.0,
+      "macro_f1_std": 0.0
+    },
+    {
+      "model": "shared_hierarchical",
+      "accuracy": 0.45220338983050845,
+      "balanced_accuracy": 0.4531628471344036,
+      "macro_f1": 0.4476110454873843,
+      "accuracy_std": 0.0,
+      "macro_f1_std": 0.0
+    },
+    {
+      "model": "three_component_mean",
+      "accuracy": 0.46870056497175144,
+      "balanced_accuracy": 0.45658519084338495,
+      "macro_f1": 0.45677132652683133,
+      "accuracy_std": 0.0044338585668323984,
+      "macro_f1_std": 0.004687490652309122
+    }
+  ]
+}

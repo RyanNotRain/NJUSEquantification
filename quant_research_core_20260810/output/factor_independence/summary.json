@@ -1,0 +1,48 @@
+{
+  "status": "completed",
+  "selection_status": "frozen_before_post_calibration_backtest",
+  "calibration_days": 120,
+  "calibration_start": "2025-04-01",
+  "freeze_date": "2025-09-22",
+  "trade_start": "2025-09-23",
+  "evaluation_start": "2025-09-24",
+  "correlation_threshold": 0.6,
+  "realization_lag_days_for_ic_selection": 2,
+  "raw_factor_count": 10,
+  "cluster_count": 6,
+  "selected_factors": [
+    "example_factor",
+    "momentum_10d",
+    "volatility_10d",
+    "buy_sell_imbalance",
+    "intraday_range",
+    "volume_price_corr_20d"
+  ],
+  "orthogonalization_order": [
+    "example_factor",
+    "volatility_10d",
+    "momentum_10d",
+    "intraday_range",
+    "momentum_20d",
+    "volatility_5d",
+    "momentum_5d",
+    "volatility_20d",
+    "volume_price_corr_20d",
+    "buy_sell_imbalance"
+  ],
+  "post_freeze_independence": {
+    "raw_max_abs_correlation": 0.8367767389413776,
+    "pruned_max_abs_correlation": 0.597431207398441,
+    "orthogonalized_max_abs_correlation": 0.09619819210030559,
+    "raw_effective_rank": 6.3253996665002,
+    "pruned_effective_rank": 5.03072308648561,
+    "orthogonalized_effective_rank": 9.955506867881255
+  },
+  "best_post_freeze_by_geometric_excess": {
+    "factor_set": "cluster_pruned",
+    "strategy_total_return": 0.13719060214649992,
+    "market_total_return": -0.07299362536581144,
+    "geometric_excess_return": 0.2267343928408836
+  },
+  "neutralization": "industry/market-cap neutralization remains unavailable because genuine exposure tables are not supplied; no proxy is fabricated"
+}

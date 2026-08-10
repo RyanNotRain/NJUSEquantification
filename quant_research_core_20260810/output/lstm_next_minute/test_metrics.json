@@ -1,0 +1,58 @@
+{
+  "accuracy": 0.45559322033898303,
+  "balanced_accuracy": 0.46905354718774533,
+  "macro_f1": 0.45561445029698305,
+  "weighted_f1": 0.4537485801001492,
+  "confusion_matrix": [
+    [
+      967,
+      438,
+      330
+    ],
+    [
+      931,
+      968,
+      678
+    ],
+    [
+      433,
+      402,
+      753
+    ]
+  ],
+  "class_names": [
+    "down",
+    "flat",
+    "up"
+  ],
+  "per_class": {
+    "down": {
+      "precision": 0.41484341484341486,
+      "recall": 0.5573487031700288,
+      "f1": 0.4756517461878997,
+      "support": 1735
+    },
+    "flat": {
+      "precision": 0.5353982300884956,
+      "recall": 0.37563057819169576,
+      "f1": 0.44150513112884837,
+      "support": 2577
+    },
+    "up": {
+      "precision": 0.42759795570698467,
+      "recall": 0.47418136020151136,
+      "f1": 0.4496864735742013,
+      "support": 1588
+    }
+  },
+  "nonflat_direction_accuracy": 0.5176045741799579,
+  "true_nonflat_rate": 0.5632203389830508,
+  "predicted_move_rate": 0.6935593220338983,
+  "true_nonflat_capture_rate": 0.7472163707493229,
+  "move_signal_exact_accuracy": 0.4203323558162268,
+  "movement_detection_accuracy": 0.5849152542372882,
+  "movement_detection_balanced_accuracy": 0.5614234744705093,
+  "f1": 0.45561445029698305,
+  "majority_baseline": 0.43677966101694915,
+  "scope": "all valid next-minute windows; down/flat/up three-class target"
+}

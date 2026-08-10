@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "run_dir": "E:\\屄养的不学了\\笔试\\兆信\\project\\output\\lstm_ensemble",
+  "model_reloaded": true,
+  "rows_replayed": 5900,
+  "metadata_exact": true,
+  "labels_exact": true,
+  "predicted_classes_exact": true,
+  "probabilities_within_tolerance": true,
+  "maximum_probability_error": 3.90438705444307e-05,
+  "probability_tolerance": 0.0001,
+  "accuracy": 0.4645762711864407,
+  "macro_f1": 0.4593136172123016,
+  "confusion_matrix": [
+    [
+      855,
+      577,
+      303
+    ],
+    [
+      761,
+      1221,
+      595
+    ],
+    [
+      339,
+      584,
+      665
+    ]
+  ]
+}

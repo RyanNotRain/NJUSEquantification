@@ -1,0 +1,297 @@
+{
+  "config": {
+    "experiment": "shared_lstm_direction_plus_signed_return",
+    "status": "exploratory_not_official_model",
+    "stock_codes": [
+      "000012.SZ",
+      "000014.SZ",
+      "000019.SZ",
+      "000020.SZ",
+      "000027.SZ"
+    ],
+    "splits": {
+      "train": [
+        "20250401",
+        "20260531"
+      ],
+      "val": [
+        "20260601",
+        "20260615"
+      ],
+      "test": [
+        "20260616",
+        "20260630"
+      ]
+    },
+    "seq_len": 60,
+    "hidden_size": 64,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "epochs_requested": 12,
+    "best_epoch_by_validation_return_ic": 7,
+    "patience": 4,
+    "batch_size": 256,
+    "learning_rate": 0.001,
+    "return_loss_weight": 0.25,
+    "return_observation_weight": "0.25 + min(abs(standardized_return), 3) / 3",
+    "return_transform": {
+      "unit": "basis_points",
+      "center": 0.0,
+      "scale": 12.737183154835442,
+      "cap": 58.745860020502406
+    },
+    "selection": "validation return Spearman IC, accuracy as tie-break",
+    "thresholds_frozen_on_validation": {
+      "predicted_return_bps": {
+        "all": 0.0,
+        "balanced": 4.530911588668819,
+        "strict": 10.78806838989258
+      },
+      "confidence": {
+        "all": 0.0,
+        "balanced": 0.5241025686264038,
+        "strict": 0.601137101650238
+      }
+    },
+    "sell_fee_bps": 5.0,
+    "coverage": {
+      "train": {
+        "all_valid_windows": 165790,
+        "nonflat_windows": 95912,
+        "flat_windows": 69878,
+        "up_windows": 46511,
+        "down_windows": 49401,
+        "nonflat_coverage": 0.5785149888413053,
+        "flat_rate": 0.42148501115869474
+      },
+      "val": {
+        "all_valid_windows": 6490,
+        "nonflat_windows": 3909,
+        "flat_windows": 2581,
+        "up_windows": 1916,
+        "down_windows": 1993,
+        "nonflat_coverage": 0.60231124807396,
+        "flat_rate": 0.3976887519260401
+      },
+      "test": {
+        "all_valid_windows": 5900,
+        "nonflat_windows": 3323,
+        "flat_windows": 2577,
+        "up_windows": 1588,
+        "down_windows": 1735,
+        "nonflat_coverage": 0.5632203389830508,
+        "flat_rate": 0.43677966101694915
+      }
+    },
+    "seed": 42
+  },
+  "validation_metrics": {
+    "classification": {
+      "accuracy": 0.46656394453004624,
+      "macro_f1": 0.4562883869368431,
+      "brier": 0.6127612914475511,
+      "nll": 1.0122536554415107,
+      "top_label_ece": 0.030145741652113554
+    },
+    "return": {
+      "mae_bps": 10.938651247117802,
+      "rmse_bps": 14.970598452667781,
+      "pearson_ic": 0.29272094496642387,
+      "spearman_ic": 0.30110081724723503,
+      "nonflat_sign_accuracy": 0.6561780506523408,
+      "predicted_mean_bps": -0.18676698614772516,
+      "predicted_std_bps": 8.46522494155828
+    }
+  },
+  "test_metrics": {
+    "classification": {
+      "accuracy": 0.4647457627118644,
+      "macro_f1": 0.4476657428142025,
+      "brier": 0.610202563497677,
+      "nll": 1.0027939966651005,
+      "top_label_ece": 0.03162841420425347
+    },
+    "return": {
+      "mae_bps": 11.153162944695707,
+      "rmse_bps": 15.234607105040869,
+      "pearson_ic": 0.3216972446991088,
+      "spearman_ic": 0.3345677727968623,
+      "nonflat_sign_accuracy": 0.6825157989768281,
+      "predicted_mean_bps": -0.4762762215092652,
+      "predicted_std_bps": 9.162103603490715
+    }
+  },
+  "strategy_rows": [
+    {
+      "method": "official_direction_classifier",
+      "tier": "all",
+      "validation_threshold": 0.0,
+      "bars": 1180,
+      "active_bars": 898,
+      "bar_coverage": 0.7610169491525424,
+      "gross_total_return": -0.01115971520289638,
+      "net_total_return": -0.36893141282855957,
+      "mean_net_return_bp": -3.89387535017868,
+      "net_bar_sharpe_sqrt_n": -11.678280652290217,
+      "net_max_drawdown": -0.3696604545542106,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.09576654233434412,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.0967153693192373,
+      "t1_excess_vs_full_market": 0.030662770799386507,
+      "t1_excess_vs_exposure_matched_market": 0.001050418608559811
+    },
+    {
+      "method": "official_direction_classifier",
+      "tier": "balanced",
+      "validation_threshold": 0.51745907,
+      "bars": 1180,
+      "active_bars": 380,
+      "bar_coverage": 0.3220338983050847,
+      "gross_total_return": 0.046013320597757756,
+      "net_total_return": -0.13501155248629337,
+      "mean_net_return_bp": -1.2252626638136634,
+      "net_bar_sharpe_sqrt_n": -4.8210379766292,
+      "net_max_drawdown": -0.134578841907247,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.042656956456664896,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.046054445944110456,
+      "t1_excess_vs_full_market": 0.09119810321011923,
+      "t1_excess_vs_exposure_matched_market": 0.0035615129951604985
+    },
+    {
+      "method": "official_direction_classifier",
+      "tier": "strict",
+      "validation_threshold": 0.57905022,
+      "bars": 1180,
+      "active_bars": 118,
+      "bar_coverage": 0.1,
+      "gross_total_return": 0.0074759403115638445,
+      "net_total_return": -0.050256161005736155,
+      "mean_net_return_bp": -0.4355436112874295,
+      "net_bar_sharpe_sqrt_n": -2.8055880659984496,
+      "net_max_drawdown": -0.05322104587967391,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.016819616676451044,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.015587586386004104,
+      "t1_excess_vs_full_market": 0.1206480024393588,
+      "t1_excess_vs_exposure_matched_market": -0.001251538758967774
+    },
+    {
+      "method": "multitask_direction_classifier",
+      "tier": "all",
+      "validation_threshold": 0.0,
+      "bars": 1180,
+      "active_bars": 747,
+      "bar_coverage": 0.6330508474576271,
+      "gross_total_return": 0.028772825870154062,
+      "net_total_return": -0.29193045031871034,
+      "mean_net_return_bp": -2.918061003376265,
+      "net_bar_sharpe_sqrt_n": -8.440541558843757,
+      "net_max_drawdown": -0.2989461133366329,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.07658368727561249,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.08148181660552234,
+      "t1_excess_vs_full_market": 0.05252775973456236,
+      "t1_excess_vs_exposure_matched_market": 0.0053326427483539884
+    },
+    {
+      "method": "multitask_direction_classifier",
+      "tier": "balanced",
+      "validation_threshold": 0.5241025388240814,
+      "bars": 1180,
+      "active_bars": 193,
+      "bar_coverage": 0.1635593220338983,
+      "gross_total_return": 0.01728062306802247,
+      "net_total_return": -0.07631361912941492,
+      "mean_net_return_bp": -0.6704243920573723,
+      "net_bar_sharpe_sqrt_n": -3.4046547227178325,
+      "net_max_drawdown": -0.07928923396980647,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.024909680958687952,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.025250902649825324,
+      "t1_excess_vs_full_market": 0.11142679081708495,
+      "t1_excess_vs_exposure_matched_market": 0.0003500610485969169
+    },
+    {
+      "method": "multitask_direction_classifier",
+      "tier": "strict",
+      "validation_threshold": 0.6011370956897736,
+      "bars": 1180,
+      "active_bars": 35,
+      "bar_coverage": 0.029661016949152543,
+      "gross_total_return": -0.000949629416696407,
+      "net_total_return": -0.01828571903798404,
+      "mean_net_return_bp": -0.15573388540167016,
+      "net_bar_sharpe_sqrt_n": -1.471098170884631,
+      "net_max_drawdown": -0.0282571315625868,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.006680524669412491,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.005936787985505565,
+      "t1_excess_vs_full_market": 0.13220473546308664,
+      "t1_excess_vs_exposure_matched_market": -0.0007481784608039943
+    },
+    {
+      "method": "multitask_predicted_return",
+      "tier": "all",
+      "validation_threshold": 0.0,
+      "bars": 1180,
+      "active_bars": 1118,
+      "bar_coverage": 0.9474576271186441,
+      "gross_total_return": 0.0022796398003528395,
+      "net_total_return": -0.42699560614908927,
+      "mean_net_return_bp": -4.713215692665892,
+      "net_bar_sharpe_sqrt_n": -16.452984175251913,
+      "net_max_drawdown": -0.4272158666669219,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.12028702059125451,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.1172698161874377,
+      "t1_excess_vs_full_market": 0.002713855784854946,
+      "t1_excess_vs_exposure_matched_market": -0.0034180369711448444
+    },
+    {
+      "method": "multitask_predicted_return",
+      "tier": "balanced",
+      "validation_threshold": 4.530911588668819,
+      "bars": 1180,
+      "active_bars": 968,
+      "bar_coverage": 0.8203389830508474,
+      "gross_total_return": 0.03944187870432381,
+      "net_total_return": -0.35944361401360037,
+      "mean_net_return_bp": -3.7678928825693188,
+      "net_bar_sharpe_sqrt_n": -11.689443909894168,
+      "net_max_drawdown": -0.3596898412376712,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.09938827276740769,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.10017393865451918,
+      "t1_excess_vs_full_market": 0.02653465245607034,
+      "t1_excess_vs_exposure_matched_market": 0.000873130842572678
+    },
+    {
+      "method": "multitask_predicted_return",
+      "tier": "strict",
+      "validation_threshold": 10.78806838989258,
+      "bars": 1180,
+      "active_bars": 511,
+      "bar_coverage": 0.4330508474576271,
+      "gross_total_return": 0.06584269719637392,
+      "net_total_return": -0.1745004136363809,
+      "mean_net_return_bp": -1.6202821939920744,
+      "net_bar_sharpe_sqrt_n": -5.722149995239562,
+      "net_max_drawdown": -0.17601555690416626,
+      "t1_settled_days": 9,
+      "t1_net_total_return": -0.054587417244210124,
+      "t1_full_market_total_return": -0.12266797318745826,
+      "t1_exposure_matched_market_return": -0.05271995733856005,
+      "t1_excess_vs_full_market": 0.07759953342931447,
+      "t1_excess_vs_exposure_matched_market": -0.001971391585959492
+    }
+  ]
+}

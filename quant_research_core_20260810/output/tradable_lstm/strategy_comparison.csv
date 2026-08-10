@@ -1,0 +1,4 @@
+horizon,model,threshold_bps,top_k,interval_minutes,selection_source,periods,active_periods,coverage,gross_total_return,net_total_return,matched_market_total_return,excess_vs_matched_market,mean_selected_names
+t1_same_minute_open,ridge,57.4742698669,1,60,validation_only,9,26,0.9629629630,-0.1029040519,-0.1068327985,-0.1129865234,0.0069375777,1.0000000000
+t1_same_minute_open,hist_gradient_boosting_regressor,157.9908497959,1,30,validation_only,9,8,0.1777777778,-0.0074790555,-0.0082768076,-0.0016214969,-0.0066661198,1.0000000000
+t1_same_minute_open,compact_multitask_lstm,0.0000000000,1,60,,9,27,1.0000000000,-0.1876406724,-0.1913748464,-0.1202662582,-0.0808296702,1.0000000000
