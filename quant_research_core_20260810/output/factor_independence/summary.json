@@ -40,9 +40,9 @@
   },
   "best_post_freeze_by_geometric_excess": {
     "factor_set": "cluster_pruned",
-    "strategy_total_return": 0.13719060214649992,
+    "strategy_total_return": 0.12595598909509853,
     "market_total_return": -0.07299362536581144,
-    "geometric_excess_return": 0.2267343928408836
+    "geometric_excess_return": 0.2146151525003468
   },
   "neutralization": "industry/market-cap neutralization remains unavailable because genuine exposure tables are not supplied; no proxy is fabricated"
 }

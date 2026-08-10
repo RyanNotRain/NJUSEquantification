@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from qd.config import METRICS, OUTPUT_DIR, TOTAL_BARS
+from qd.factors import REQUIRED_FACTOR_NAMES
 
 
 def _shape(path: Path) -> tuple[int, int]:
@@ -52,6 +53,31 @@ def main() -> None:
         "status": "passed", "factor_count": int(len(factor_summary)),
         "ir_definition": "sqrt(252) * ICIR",
     }
+    required_summary = pd.read_csv(
+        OUTPUT_DIR / "evaluation" / "required_factor_summary.csv"
+    )
+    layer_daily = pd.read_csv(
+        OUTPUT_DIR / "evaluation" / "factor_layer_daily_returns.csv"
+    )
+    layer_nav = pd.read_csv(OUTPUT_DIR / "evaluation" / "factor_layer_nav.csv")
+    monotonicity = pd.read_csv(
+        OUTPUT_DIR / "evaluation" / "factor_layer_monotonicity.csv"
+    )
+    layer_columns = {"factor", "signal_date", "Q1", "Q2", "Q3", "Q4", "Q5", "Q1_minus_Q5"}
+    if (
+        tuple(required_summary["factor"]) != REQUIRED_FACTOR_NAMES
+        or set(monotonicity["factor"]) != set(factor_summary["factor"])
+        or not layer_columns.issubset(layer_daily.columns)
+        or not layer_columns.issubset(layer_nav.columns)
+        or not (OUTPUT_DIR / "evaluation" / "required_factor_layering_nav.png").exists()
+    ):
+        raise AssertionError("prompt-required factor set or five-layer NAV outputs are incomplete")
+    checks["tasks2_3"]["prompt_required_set"] = list(REQUIRED_FACTOR_NAMES)
+    checks["tasks2_3"]["five_layer_nav"] = {
+        "factor_count": int(monotonicity["factor"].nunique()),
+        "groups": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+        "daily_rows": int(len(layer_daily)),
+    }
     robustness_root = OUTPUT_DIR / "factor_robustness"
     factor_robustness = json.loads(
         (robustness_root / "summary.json").read_text(encoding="utf-8")
@@ -89,6 +115,32 @@ def main() -> None:
             backtest.loc[~backtest["strategy"].str.startswith("naive")]
             .sort_values("sharpe_ratio", ascending=False).iloc[0]["strategy"]
         ),
+    }
+    required_backtest_root = OUTPUT_DIR / "backtest_required"
+    required_backtest = pd.read_csv(required_backtest_root / "metrics.csv")
+    required_metadata = json.loads(
+        (required_backtest_root / "metadata.json").read_text(encoding="utf-8")
+    )
+    if (
+        set(required_backtest["strategy"]) != required_strategies
+        or required_metadata.get("factor_set") != "required"
+        or tuple(required_metadata.get("factor_names", [])) != REQUIRED_FACTOR_NAMES
+        or not required_backtest["factor_count"].eq(4).all()
+    ):
+        raise AssertionError("prompt-required four-factor Task4 backtest is incomplete")
+    required_benchmarks = {}
+    for strategy_name, execution in (("adaptive_close", "close"), ("adaptive_open", "open")):
+        item = json.loads(
+            (required_backtest_root / f"benchmark_metrics_{strategy_name}.json")
+            .read_text(encoding="utf-8")
+        )
+        if item.get("strategy") != strategy_name or item.get("execution") != execution:
+            raise AssertionError(f"mismatched Task4 benchmark for {strategy_name}")
+        required_benchmarks[strategy_name] = item["full_period"]["geometric_excess_return"]
+    checks["task4"]["prompt_required_four_factor_backtest"] = {
+        "factor_names": list(REQUIRED_FACTOR_NAMES),
+        "strategy_count": int(len(required_backtest)),
+        "full_period_geometric_excess": required_benchmarks,
     }
     benchmark = json.loads(
         (OUTPUT_DIR / "backtest_strict" / "benchmark_metrics.json").read_text(encoding="utf-8")

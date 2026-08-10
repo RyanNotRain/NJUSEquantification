@@ -5,8 +5,8 @@
 ## 当前正式结论
 
 - Task 1：完成 302 个交易日、300 只股票的日频与分钟频降采样。日频和分钟频均包含 OHLC、成交量、成交笔数、成交额、主买/主卖量额共 11 个字段；OHLC 已使用 `adjfactor.pkl` 复权。
-- Task 2–3：构建题目示例因子和 9 个扩展因子，保存 IC、年化 IR、ICIR、Rank IC、分层、滚动/分期 IC、5 日区块 bootstrap、因子相关性和市场状态条件检验。另用前 120 日冻结相关性聚类与正交顺序：聚类精选将因子从 10 个降到 6 个，冻结后最大相关性由 0.837 降到 0.597；正交分量进一步降到 0.096。
-- Task 4：所有可交易策略只使用决策时点已经实现的历史 IC，并使用现金＋股数账本。`adaptive_close` 总收益 15.38%，从首次执行日起相对 300 股等权市场取得 6.15% 几何超额。Top20 缓冲版本将 5 bps 成本下收益提高到 16.68%。在单独的 181 日冻结后比较中，原始、聚类精选、正交化组合的几何超额分别为 11.20%、22.67%、14.48%；该结果属于一次冻结后的探索性证据，尚需 walk-forward 确认。
+- Task 2–3：正式答题集合严格限定为题目示例因子加 3 个自建因子（20 日动量、主买卖失衡、20 日量价相关）；其余 6 个因子只作扩展。示例因子的 5/10/20 日均值必须满足完整窗口。除 IC、年化 IR、ICIR 和 Rank 指标外，现已保存 Q1–Q5 逐日收益、五条累计净值曲线、分层绩效和单调性指标。
+- Task 4：先用上述正式 4 因子完成收盘/次日开盘两套严格历史 IC 回测。`adaptive_close` 总收益 19.85%，相对同口径等权市场全期几何超额 12.00%；`adaptive_open` 总收益 52.76%，相对开盘等权市场超额 40.64%。两者最近 45 日均略跑输市场，且整个样本已被反复查看，不能视为盲测。10 因子扩展版 `adaptive_close` 总收益为 9.25%，缓冲版为 11.33%。冻结后聚类精选的几何超额为 21.46%，仍需 walk-forward 确认。
 - 因子学习：收益率回归和直接夏普优化在全滚动期为正，但最近 45 日夏普均小于 -3，说明因子方向在近期失效。
 - Task 5：正式模型为三个独立 LSTM 的概率融合。可交易 T+1 基线中 Ridge 的同覆盖超额为 +0.69%，原25特征紧凑 LSTM 为 -8.08%。训练集聚类精选19个输入后，收益 Rank IC 从 -0.017 提高到 +0.065、同覆盖超额改善至 -0.67%。另将原题 `Time/Price/Volume/BSFlag` 映射为四个平稳特征重训，Accuracy 45.54%、Rank IC -0.121、同覆盖超额 -2.40%；它好于原25特征的相对收益，但明显弱于19特征，说明问题是重复输入而非所有新增信息都有害。
 
@@ -15,10 +15,11 @@
 | 模块 | 入口 | 正式输出 |
 |---|---|---|
 | Task 1 | `scripts/run_step1.py` | `../output/daily`、`../output/minute` |
-| Task 2–3 | `scripts/run_factor_eval.py` | `../output/factors`、`../output/evaluation` |
+| Task 2–3 | `scripts/run_factor_eval.py` | `../output/factors`、`../output/evaluation`（含 Q1–Q5 五条净值曲线） |
 | 因子稳健性 | `scripts/run_factor_robustness.py` | `../output/factor_robustness` |
 | 因子去冗余 | `scripts/run_factor_independence.py` | `../output/factor_independence` |
-| Task 4 | `scripts/run_task4_strict.py` | `../output/backtest_strict` |
+| Task 4 正式 4 因子 | `scripts/run_task4_strict.py --factor-set required` | `../output/backtest_required` |
+| Task 4 扩展 10 因子 | `scripts/run_task4_strict.py --factor-set extended` | `../output/backtest_strict` |
 | Task 4 换手/成本 | `scripts/run_task4_robustness.py` | `../output/backtest_robustness` |
 | Task 4/5 相对收益 | `scripts/run_strategy_analysis.py` | 基准、超额收益与 LSTM 策略诊断 |
 | 因子学习 | `scripts/run_factor_models.py` | `../output/factor_models_*` |

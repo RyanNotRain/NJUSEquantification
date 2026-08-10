@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .config import APPLY_ADJFACTOR, OUTPUT_DIR
-from .factors import compute_all_factors, load_daily_data
+from .factors import compute_all_factors, load_daily_data, select_required_factors
 
 
 def build_signal_target(execution_price: pd.DataFrame) -> pd.DataFrame:
@@ -257,6 +257,8 @@ def run_strict_backtest(
             "selections": pd.DataFrame(selected_rows), "ic_weights": weights,
             "metadata": {"execution": execution, "method": method, "lookback": lookback,
                          "top_n": top_n, "sell_fee": sell_fee,
+                         "factor_count": len(factors),
+                         "factor_names": ",".join(factors),
                          "selection_policy": selection_policy, "buffer_n": buffer_n,
                          "max_replacements": max_replacements,
                          "min_liquidity_quantile": min_liquidity_quantile,
@@ -314,10 +316,18 @@ def _plot(results: dict[str, dict], out_dir: Path) -> None:
     plt.close(fig)
 
 
-def run_all_strict(lookback: int = 60, top_n: int = 10) -> tuple[pd.DataFrame, Path]:
+def run_all_strict(
+    lookback: int = 60,
+    top_n: int = 10,
+    factor_set: str = "required",
+    out_dir: Path | None = None,
+) -> tuple[pd.DataFrame, Path]:
+    if factor_set not in {"required", "extended"}:
+        raise ValueError("factor_set must be required or extended")
     daily = load_daily_data()
     factor_bundle = compute_all_factors(daily)
-    factors = {k: v for k, v in factor_bundle.items() if k != "forward_return_1d"}
+    all_factors = {k: v for k, v in factor_bundle.items() if k != "forward_return_1d"}
+    factors = select_required_factors(all_factors) if factor_set == "required" else all_factors
     results = {}
     for execution in ("close", "open"):
         for method in ("rolling", "expanding", "hybrid", "adaptive", "naive"):
@@ -327,7 +337,18 @@ def run_all_strict(lookback: int = 60, top_n: int = 10) -> tuple[pd.DataFrame, P
                 factors, daily, execution=execution, method=method,
                 lookback=lookback, top_n=top_n,
             )
-    out_dir = save_strict_results(results)
+    out_dir = out_dir or OUTPUT_DIR / (
+        "backtest_required" if factor_set == "required" else "backtest_strict"
+    )
+    out_dir = save_strict_results(results, out_dir)
+    metadata_path = out_dir / "metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.update({
+        "factor_set": factor_set,
+        "factor_count": len(factors),
+        "factor_names": list(factors),
+    })
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     metrics = pd.read_csv(out_dir / "metrics.csv")
     print(metrics[["strategy", "annual_return_cagr", "sharpe_ratio", "max_drawdown", "average_sell_turnover"]].to_string(index=False))
     return metrics, out_dir

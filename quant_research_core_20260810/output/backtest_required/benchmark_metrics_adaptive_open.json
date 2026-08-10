@@ -1,0 +1,74 @@
+{
+  "benchmark_definition": "Daily-rebalanced equal weight across all 300 adjusted open series; forward-filled halted prices contribute zero return. Benchmark trading costs are omitted.",
+  "strategy": "adaptive_open",
+  "execution": "open",
+  "full_period": {
+    "strategy": {
+      "observations": 301,
+      "total_return": 0.5276311955175299,
+      "cagr": 0.42581117897910703,
+      "annualized_volatility": 0.20366760552349958,
+      "sharpe": 1.8442551652871126,
+      "max_drawdown": -0.18188644584014513
+    },
+    "benchmark": {
+      "observations": 301,
+      "total_return": 0.0862098907720854,
+      "cagr": 0.07168543444039743,
+      "annualized_volatility": 0.19580678491508863,
+      "sharpe": 0.4519446721285,
+      "max_drawdown": -0.17691509968538432
+    },
+    "geometric_excess_return": 0.4063867476217504,
+    "information_ratio": 1.773146792115799,
+    "beta": 0.6990071071860923,
+    "annualized_arithmetic_alpha": 0.3137572151331507
+  },
+  "from_first_execution": {
+    "strategy": {
+      "observations": 277,
+      "total_return": 0.5276311955175299,
+      "cagr": 0.4703148680807099,
+      "annualized_volatility": 0.21221354978323712,
+      "sharpe": 1.9233422971087317,
+      "max_drawdown": -0.18188644584014513
+    },
+    "benchmark": {
+      "observations": 277,
+      "total_return": 0.07243294326781213,
+      "cagr": 0.06568574945808625,
+      "annualized_volatility": 0.17262445533631687,
+      "sharpe": 0.4548806671807096,
+      "max_drawdown": -0.176915099685384
+    },
+    "geometric_excess_return": 0.42445381327310083,
+    "information_ratio": 2.563090203892843,
+    "beta": 0.9781065183674693,
+    "annualized_arithmetic_alpha": 0.33135492230778285
+  },
+  "first_execution_date": "2025-05-12",
+  "last_45_days": {
+    "strategy": {
+      "observations": 45,
+      "total_return": -0.1568046467226113,
+      "cagr": -0.6152328863629021,
+      "annualized_volatility": 0.24655401328206183,
+      "sharpe": -3.7462786012058045,
+      "max_drawdown": -0.17254045118850914
+    },
+    "benchmark": {
+      "observations": 45,
+      "total_return": -0.12786584478235985,
+      "cagr": -0.5351996439457476,
+      "annualized_volatility": 0.18047515353702992,
+      "sharpe": -4.1502552721703,
+      "max_drawdown": -0.1629362955913859
+    },
+    "geometric_excess_return": -0.03318159455987568,
+    "information_ratio": -1.073064424833135,
+    "beta": 1.0265538485482173,
+    "annualized_arithmetic_alpha": -0.15475275713483475
+  },
+  "recent_start": "2026-04-23",
+  "recent_end": "2026-06-30"
+}

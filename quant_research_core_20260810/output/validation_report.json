@@ -158,6 +158,23 @@
       "status": "passed",
       "factor_count": 10,
       "ir_definition": "sqrt(252) * ICIR",
+      "prompt_required_set": [
+        "example_factor",
+        "momentum_20d",
+        "buy_sell_imbalance",
+        "volume_price_corr_20d"
+      ],
+      "five_layer_nav": {
+        "factor_count": 10,
+        "groups": [
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4",
+          "Q5"
+        ],
+        "daily_rows": 2929
+      },
       "robustness": {
         "bootstrap_factor_count": 10,
         "latest_quarter": "2026Q2",
@@ -169,14 +186,27 @@
       "status": "passed",
       "strategy_count": 10,
       "best_strict_by_sharpe": "adaptive_close",
+      "prompt_required_four_factor_backtest": {
+        "factor_names": [
+          "example_factor",
+          "momentum_20d",
+          "buy_sell_imbalance",
+          "volume_price_corr_20d"
+        ],
+        "strategy_count": 10,
+        "full_period_geometric_excess": {
+          "adaptive_close": 0.11997459717823844,
+          "adaptive_open": 0.4063867476217504
+        }
+      },
       "benchmark_analysis": {
-        "full_excess_return": 0.07822059951102034,
-        "post_warmup_excess_return": 0.06153212228114646,
+        "full_excess_return": 0.020904793147953127,
+        "post_warmup_excess_return": 0.005103438209969946,
         "last_45_day_excess_return": -0.016675319938122546
       },
       "turnover_cost_robustness": {
         "rows": 8,
-        "buffered_5bp_total_return": 0.1668354779
+        "buffered_5bp_total_return": 0.1132927165
       },
       "factor_independence": {
         "calibration_days": 120,
@@ -194,9 +224,9 @@
         "orthogonalized_max_abs_correlation": 0.0961981921,
         "best_post_freeze_by_geometric_excess": {
           "factor_set": "cluster_pruned",
-          "strategy_total_return": 0.13719060214649992,
+          "strategy_total_return": 0.12595598909509853,
           "market_total_return": -0.07299362536581144,
-          "geometric_excess_return": 0.2267343928408836
+          "geometric_excess_return": 0.2146151525003468
         }
       }
     },

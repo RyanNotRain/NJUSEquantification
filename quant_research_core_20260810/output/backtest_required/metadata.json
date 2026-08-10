@@ -1,0 +1,13 @@
+{
+  "price_adjustment": "applied",
+  "signal_timing": "factor at close t, execution at t+1 open/close",
+  "ic_timing": "only IC labels fully realized by decision date are used",
+  "factor_set": "required",
+  "factor_count": 4,
+  "factor_names": [
+    "example_factor",
+    "momentum_20d",
+    "buy_sell_imbalance",
+    "volume_price_corr_20d"
+  ]
+}

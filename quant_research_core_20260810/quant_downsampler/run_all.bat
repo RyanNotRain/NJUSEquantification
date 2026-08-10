@@ -11,10 +11,16 @@ if errorlevel 1 exit /b %errorlevel%
 call run.bat run_factor_robustness.py
 if errorlevel 1 exit /b %errorlevel%
 
-call run.bat run_task4_strict.py
+call run.bat run_task4_strict.py --factor-set required --out ..\output\backtest_required
 if errorlevel 1 exit /b %errorlevel%
 
-call run.bat run_strategy_analysis.py --task4-only --recent-days 45
+call run.bat run_strategy_analysis.py --task4-only --task4-dir backtest_required --recent-days 45
+if errorlevel 1 exit /b %errorlevel%
+
+call run.bat run_task4_strict.py --factor-set extended --out ..\output\backtest_strict
+if errorlevel 1 exit /b %errorlevel%
+
+call run.bat run_strategy_analysis.py --task4-only --task4-dir backtest_strict --recent-days 45
 if errorlevel 1 exit /b %errorlevel%
 
 call run.bat run_task4_robustness.py

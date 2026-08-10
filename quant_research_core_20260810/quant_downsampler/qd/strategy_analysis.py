@@ -60,15 +60,19 @@ def run_task4_benchmark_analysis(
     output_dir: str | Path = OUTPUT_DIR,
     strategy_name: str = "adaptive_close",
     recent_days: int = 45,
+    backtest_dir: str = "backtest_strict",
 ) -> dict:
     """Build a daily-rebalanced equal-weight benchmark for the strict Task 4 result."""
     root = Path(output_dir)
-    close = pd.read_csv(root / "daily" / "close.csv", index_col=0)
-    close.index = pd.to_datetime(close.index)
-    benchmark_return = close.pct_change(fill_method=None).mean(axis=1, skipna=True)
+    execution = strategy_name.rsplit("_", 1)[-1]
+    if execution not in {"open", "close"}:
+        raise ValueError("strategy_name must end in _open or _close")
+    benchmark_price = pd.read_csv(root / "daily" / f"{execution}.csv", index_col=0)
+    benchmark_price.index = pd.to_datetime(benchmark_price.index)
+    benchmark_return = benchmark_price.pct_change(fill_method=None).mean(axis=1, skipna=True)
     benchmark_return.name = "benchmark_return"
 
-    strategy_path = root / "backtest_strict" / f"{strategy_name}_daily.csv"
+    strategy_path = root / backtest_dir / f"{strategy_name}_daily.csv"
     strategy_frame = pd.read_csv(strategy_path, index_col=0)
     strategy_frame.index = pd.to_datetime(strategy_frame.index)
     comparison = pd.concat(
@@ -80,16 +84,17 @@ def run_task4_benchmark_analysis(
     comparison["excess_nav"] = comparison["strategy_nav"] / comparison["benchmark_nav"]
 
     recent_count = min(int(recent_days), len(comparison))
-    selections_path = root / "backtest_strict" / f"{strategy_name}_selections.csv"
+    selections_path = root / backtest_dir / f"{strategy_name}_selections.csv"
     selections = pd.read_csv(selections_path)
     first_execution = pd.to_datetime(selections["execution_date"]).min()
     active_period = comparison.loc[comparison.index >= first_execution]
     summary = {
         "benchmark_definition": (
-            "Daily-rebalanced equal weight across all 300 adjusted close series; "
+            f"Daily-rebalanced equal weight across all 300 adjusted {execution} series; "
             "forward-filled halted prices contribute zero return. Benchmark trading costs are omitted."
         ),
         "strategy": strategy_name,
+        "execution": execution,
         "full_period": relative_metrics(
             comparison["strategy_return"], comparison["benchmark_return"]
         ),
@@ -105,12 +110,21 @@ def run_task4_benchmark_analysis(
         "recent_end": comparison.index[-1].strftime("%Y-%m-%d"),
     }
 
-    target = root / "backtest_strict"
+    target = root / backtest_dir
     comparison.to_csv(target / "benchmark_comparison_daily.csv", float_format="%.10f")
     (target / "benchmark_metrics.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     _plot_task4_benchmark(comparison, target / "benchmark_comparison.png")
+    comparison.to_csv(
+        target / f"benchmark_comparison_{strategy_name}_daily.csv", float_format="%.10f",
+    )
+    (target / f"benchmark_metrics_{strategy_name}.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    _plot_task4_benchmark(
+        comparison, target / f"benchmark_comparison_{strategy_name}.png",
+    )
     return summary
 
 

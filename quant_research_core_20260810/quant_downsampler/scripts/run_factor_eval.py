@@ -17,8 +17,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from qd.evaluation import (  # noqa: E402
     evaluate_factor_stability,
+    layering_daily_all_factors,
     run_evaluation,
     save_evaluation_results,
+    save_layering_backtests,
 )
 from qd.factors import save_factors  # noqa: E402
 
@@ -33,6 +35,11 @@ def main() -> None:
     summary, layerings, factors = run_evaluation(args.data_dir)
     out_dir = save_evaluation_results(summary, layerings, args.out)
     forward = factors["forward_return_1d"]
+    daily_layerings = layering_daily_all_factors(
+        {k: v for k, v in factors.items() if k != "forward_return_1d"},
+        forward,
+    )
+    save_layering_backtests(daily_layerings, out_dir)
     stability = evaluate_factor_stability(
         {k: v for k, v in factors.items() if k != "forward_return_1d"},
         forward,

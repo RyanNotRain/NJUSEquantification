@@ -23,7 +23,12 @@ import pandas as pd
 from scipy import stats
 
 from .config import OUTPUT_DIR
-from .factors import compute_all_factors, load_daily_data
+from .factors import (
+    REQUIRED_FACTOR_NAMES,
+    compute_all_factors,
+    load_daily_data,
+    select_required_factors,
+)
 
 
 def compute_ic_series(
@@ -195,45 +200,12 @@ def factor_layering(
     Returns:
         DataFrame, columns=[group, mean_return, t_stat]
     """
-    common_dates = factor.index.intersection(forward_return.index)
-    common_stocks = factor.columns.intersection(forward_return.columns)
-
-    f = factor.loc[common_dates, common_stocks]
-    r = forward_return.loc[common_dates, common_stocks]
-
-    group_returns = {i: [] for i in range(n_groups)}
-
-    for date in common_dates:
-        f_row = f.loc[date].dropna()
-        r_row = r.loc[date].dropna()
-        common = f_row.index.intersection(r_row.index)
-        if len(common) < n_groups * 3:
-            continue
-
-        f_vals = f_row[common].values
-        r_vals = r_row[common].values
-
-        mask = np.isfinite(f_vals) & np.isfinite(r_vals)
-        if mask.sum() < n_groups * 3:
-            continue
-
-        f_vals = f_vals[mask]
-        r_vals = r_vals[mask]
-
-        # 按因子值分位数分组
-        try:
-            labels = pd.qcut(f_vals, n_groups, labels=False, duplicates="drop")
-        except ValueError:
-            continue
-
-        for g in range(n_groups):
-            g_mask = labels == g
-            if g_mask.sum() > 0:
-                group_returns[g].append(r_vals[g_mask].mean())
+    daily = factor_layering_daily_returns(factor, forward_return, n_groups)
 
     result_rows = []
     for g in range(n_groups):
-        arr = np.array(group_returns[g])
+        column = f"Q{g + 1}"
+        arr = daily[column].dropna().to_numpy(dtype=float) if column in daily else np.array([])
         if len(arr) > 1:
             mean_ret = arr.mean()
             t_stat = mean_ret / (arr.std(ddof=1) / np.sqrt(len(arr))) if arr.std() > 0 else 0
@@ -245,7 +217,72 @@ def factor_layering(
                 "n_days": len(arr),
             })
 
+    if not result_rows:
+        return pd.DataFrame(
+            columns=["label", "mean_return", "t_stat", "n_days"],
+        ).rename_axis("group")
     return pd.DataFrame(result_rows).set_index("group")
+
+
+def factor_layering_daily_returns(
+    factor: pd.DataFrame,
+    forward_return: pd.DataFrame,
+    n_groups: int = 5,
+) -> pd.DataFrame:
+    """Return the complete daily Q1..Qn equal-weight return series.
+
+    The index is the signal date and each value is the following trading
+    day's close-to-close return.  Keeping the daily series is essential: five
+    time averages alone cannot produce or verify a five-curve layer backtest.
+    """
+    if n_groups < 2:
+        raise ValueError("n_groups must be at least two")
+    common_dates = factor.index.intersection(forward_return.index)
+    common_stocks = factor.columns.intersection(forward_return.columns)
+    f = factor.loc[common_dates, common_stocks]
+    r = forward_return.loc[common_dates, common_stocks]
+    rows: list[dict[str, float | pd.Timestamp]] = []
+
+    for date in common_dates:
+        f_row = f.loc[date]
+        r_row = r.loc[date]
+        valid = f_row.notna() & r_row.notna()
+        f_vals = f_row[valid].replace([np.inf, -np.inf], np.nan).dropna()
+        r_vals = r_row.reindex(f_vals.index).replace([np.inf, -np.inf], np.nan)
+        valid_index = r_vals.dropna().index
+        f_vals = f_vals.reindex(valid_index)
+        r_vals = r_vals.reindex(valid_index)
+        if len(valid_index) < n_groups * 3 or f_vals.nunique() < n_groups:
+            continue
+        try:
+            labels = pd.qcut(
+                f_vals.rank(method="first"), n_groups, labels=False,
+            )
+        except ValueError:
+            continue
+        row: dict[str, float | pd.Timestamp] = {"signal_date": date}
+        for group in range(n_groups):
+            group_return = r_vals[labels == group]
+            row[f"Q{group + 1}"] = float(group_return.mean()) if len(group_return) else np.nan
+        rows.append(row)
+
+    columns = [f"Q{i}" for i in range(1, n_groups + 1)]
+    if not rows:
+        return pd.DataFrame(columns=columns, dtype=float)
+    return pd.DataFrame(rows).set_index("signal_date")[columns].sort_index()
+
+
+def layering_daily_all_factors(
+    factors: dict[str, pd.DataFrame],
+    forward_return: pd.DataFrame,
+    n_groups: int = 5,
+) -> dict[str, pd.DataFrame]:
+    """Build daily layer returns for every actual factor."""
+    return {
+        name: factor_layering_daily_returns(factor, forward_return, n_groups)
+        for name, factor in factors.items()
+        if name != "forward_return_1d"
+    }
 
 
 def layering_all_factors(
@@ -259,6 +296,138 @@ def layering_all_factors(
     for name in factor_names:
         results[name] = factor_layering(factors[name], forward_return, n_groups)
     return results
+
+
+def _layer_performance(
+    daily_return: pd.Series,
+) -> dict[str, float | int]:
+    values = daily_return.replace([np.inf, -np.inf], np.nan).dropna()
+    if values.empty:
+        return {
+            "mean_daily_return": np.nan, "annualized_return": np.nan,
+            "annualized_volatility": np.nan, "sharpe_ratio": np.nan,
+            "max_drawdown": np.nan, "final_nav": np.nan,
+            "t_stat": np.nan, "n_days": 0,
+        }
+    nav = (1.0 + values).cumprod()
+    std = float(values.std(ddof=1)) if len(values) > 1 else np.nan
+    years = len(values) / 252.0
+    annualized_return = float(nav.iloc[-1] ** (1.0 / years) - 1.0) if years > 0 else np.nan
+    annualized_volatility = std * np.sqrt(252.0) if np.isfinite(std) else np.nan
+    sharpe = float(values.mean() / std * np.sqrt(252.0)) if std > 0 else np.nan
+    drawdown = nav.div(nav.cummax()).sub(1.0)
+    t_stat = float(values.mean() / (std / np.sqrt(len(values)))) if std > 0 else np.nan
+    return {
+        "mean_daily_return": float(values.mean()),
+        "annualized_return": annualized_return,
+        "annualized_volatility": annualized_volatility,
+        "sharpe_ratio": sharpe,
+        "max_drawdown": float(drawdown.min()),
+        "final_nav": float(nav.iloc[-1]),
+        "t_stat": t_stat,
+        "n_days": int(len(values)),
+    }
+
+
+def save_layering_backtests(
+    daily_layerings: dict[str, pd.DataFrame],
+    out_dir: Path,
+) -> None:
+    """Save five layer curves, long-short diagnostics, and monotonicity tests."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    daily_rows: list[pd.DataFrame] = []
+    nav_rows: list[pd.DataFrame] = []
+    metric_rows: list[dict[str, float | int | str]] = []
+    monotonicity_rows: list[dict[str, float | int | str]] = []
+    nav_by_factor: dict[str, pd.DataFrame] = {}
+
+    for factor, raw_daily in daily_layerings.items():
+        if raw_daily.empty:
+            continue
+        daily = raw_daily.copy()
+        daily["Q1_minus_Q5"] = daily["Q1"] - daily["Q5"]
+        nav = (1.0 + daily).cumprod()
+        nav_by_factor[factor] = nav
+
+        daily_item = daily.reset_index()
+        daily_item.insert(0, "factor", factor)
+        daily_rows.append(daily_item)
+        nav_item = nav.reset_index()
+        nav_item.insert(0, "factor", factor)
+        nav_rows.append(nav_item)
+
+        for group in daily.columns:
+            metric_rows.append({
+                "factor": factor, "group": group,
+                **_layer_performance(daily[group]),
+            })
+
+        group_means = daily[[f"Q{i}" for i in range(1, 6)]].mean()
+        rho = stats.spearmanr(np.arange(1, 6), group_means.to_numpy()).statistic
+        adjacent_decreases = int(sum(
+            group_means.iloc[i] >= group_means.iloc[i + 1] for i in range(4)
+        ))
+        spread_stats = _layer_performance(daily["Q1_minus_Q5"])
+        monotonicity_rows.append({
+            "factor": factor,
+            "layer_spearman": float(rho),
+            "adjacent_decreases_out_of_4": adjacent_decreases,
+            "strictly_decreasing": bool(adjacent_decreases == 4),
+            "q1_minus_q5_mean_daily_return": spread_stats["mean_daily_return"],
+            "q1_minus_q5_t_stat": spread_stats["t_stat"],
+            "q1_minus_q5_final_nav": spread_stats["final_nav"],
+            "n_days": spread_stats["n_days"],
+        })
+
+    pd.concat(daily_rows, ignore_index=True).to_csv(
+        out_dir / "factor_layer_daily_returns.csv", index=False, float_format="%.8f",
+    )
+    pd.concat(nav_rows, ignore_index=True).to_csv(
+        out_dir / "factor_layer_nav.csv", index=False, float_format="%.8f",
+    )
+    pd.DataFrame(metric_rows).to_csv(
+        out_dir / "factor_layer_metrics.csv", index=False, float_format="%.8f",
+    )
+    pd.DataFrame(monotonicity_rows).to_csv(
+        out_dir / "factor_layer_monotonicity.csv", index=False, float_format="%.8f",
+    )
+    _plot_layering_nav(nav_by_factor, out_dir)
+
+
+def _plot_layering_nav(
+    nav_by_factor: dict[str, pd.DataFrame],
+    out_dir: Path,
+) -> None:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    colors = ["#2166ac", "#67a9cf", "#bdbdbd", "#ef8a62", "#b2182b"]
+    for factor, nav in nav_by_factor.items():
+        fig, ax = plt.subplots(figsize=(10, 5))
+        for index, group in enumerate([f"Q{i}" for i in range(1, 6)]):
+            ax.plot(nav.index, nav[group], label=group, color=colors[index], linewidth=1.35)
+        ax.axhline(1.0, color="black", linewidth=0.8, linestyle=":")
+        ax.set(title=f"Five-layer NAV: {factor}", xlabel="Signal date", ylabel="NAV")
+        ax.grid(alpha=0.25); ax.legend(ncol=5); fig.tight_layout()
+        fig.savefig(out_dir / f"layering_nav_{factor}.png", dpi=160)
+        plt.close(fig)
+
+    required = [name for name in REQUIRED_FACTOR_NAMES if name in nav_by_factor]
+    if required:
+        fig, axes = plt.subplots(2, 2, figsize=(14, 9), squeeze=False)
+        for ax, factor in zip(axes.flat, required):
+            nav = nav_by_factor[factor]
+            for index, group in enumerate([f"Q{i}" for i in range(1, 6)]):
+                ax.plot(nav.index, nav[group], label=group, color=colors[index], linewidth=1.0)
+            ax.axhline(1.0, color="black", linewidth=0.7, linestyle=":")
+            ax.set_title(factor); ax.grid(alpha=0.25)
+        handles, labels = axes.flat[0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="lower center", ncol=5)
+        fig.suptitle("Prompt-required factors: five-layer NAV", y=0.98)
+        fig.tight_layout(rect=(0, 0.05, 1, 0.96))
+        fig.savefig(out_dir / "required_factor_layering_nav.png", dpi=170)
+        plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +483,29 @@ def save_evaluation_results(
     layering_table = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
     layering_table.to_csv(out_dir / "factor_layering.csv", index=False, float_format="%.6f")
 
-    lines = ["# Factor evaluation (Task 3)", "", "## IC summary", "", "```csv", summary.to_csv(float_format="%.6f").rstrip(), "```", "", "## Layering"]
+    required_summary = summary.reindex(REQUIRED_FACTOR_NAMES)
+    required_summary.to_csv(
+        out_dir / "required_factor_summary.csv", float_format="%.6f",
+    )
+    required_layering = layering_table[
+        layering_table["factor"].isin(REQUIRED_FACTOR_NAMES)
+    ] if not layering_table.empty else layering_table
+    required_layering.to_csv(
+        out_dir / "required_factor_layering.csv", index=False, float_format="%.6f",
+    )
+
+    lines = [
+        "# Factor evaluation (Task 3)", "",
+        "## Prompt-required set: example + three original factors", "",
+        "```csv", required_summary.to_csv(float_format="%.6f").rstrip(), "```", "",
+        "The ten-factor table is an extension and is reported after the required set.", "",
+        "## Prompt-required layering", "",
+    ]
+    for factor in REQUIRED_FACTOR_NAMES:
+        table = layerings.get(factor, pd.DataFrame())
+        if not table.empty:
+            lines.extend(["", f"### {factor}", "", "```csv", table.to_csv(float_format="%.6f").rstrip(), "```"])
+    lines.extend(["", "## Extended ten-factor IC summary", "", "```csv", summary.to_csv(float_format="%.6f").rstrip(), "```", "", "## Extended layering"])
     for factor, table in layerings.items():
         if not table.empty:
             lines.extend(["", f"### {factor}", "", "```csv", table.to_csv(float_format="%.6f").rstrip(), "```"])

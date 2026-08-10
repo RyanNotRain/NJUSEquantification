@@ -5,11 +5,11 @@
   "full_period": {
     "strategy": {
       "observations": 301,
-      "total_return": 0.09245601108288692,
-      "cagr": 0.07684241027590955,
-      "annualized_volatility": 0.15602748867024194,
-      "sharpe": 0.5524438348695038,
-      "max_drawdown": -0.16347038644220435
+      "total_return": 0.19846922960835234,
+      "cagr": 0.16366282983717428,
+      "annualized_volatility": 0.20338134260867272,
+      "sharpe": 0.84694926712723,
+      "max_drawdown": -0.16058850039776262
     },
     "benchmark": {
       "observations": 301,
@@ -19,19 +19,19 @@
       "sharpe": 0.38013148642013656,
       "max_drawdown": -0.18343766926983396
     },
-    "geometric_excess_return": 0.020904793147953127,
-    "information_ratio": 0.04841713932321479,
-    "beta": 0.489457298733968,
-    "annualized_arithmetic_alpha": 0.04777218771386091
+    "geometric_excess_return": 0.11997459717823844,
+    "information_ratio": 0.5624656154623242,
+    "beta": 0.6592382776625155,
+    "annualized_arithmetic_alpha": 0.12050099801272446
   },
   "from_first_execution": {
     "strategy": {
       "observations": 280,
-      "total_return": 0.09245601108288692,
-      "cagr": 0.08283818636435258,
-      "annualized_volatility": 0.16178559618250346,
-      "sharpe": 0.5727404551853484,
-      "max_drawdown": -0.16347038644220435
+      "total_return": 0.19846922960835234,
+      "cagr": 0.1769667645212416,
+      "annualized_volatility": 0.21087403958899634,
+      "sharpe": 0.8781199684935639,
+      "max_drawdown": -0.16058850039776262
     },
     "benchmark": {
       "observations": 280,
@@ -41,20 +41,20 @@
       "sharpe": 0.5122615941778641,
       "max_drawdown": -0.1834376692698333
     },
-    "geometric_excess_return": 0.005103438209969946,
-    "information_ratio": 0.01714252573816719,
-    "beta": 0.7153508816372646,
-    "annualized_arithmetic_alpha": 0.02775584728433369
+    "geometric_excess_return": 0.10263986013878457,
+    "information_ratio": 0.7612010082998742,
+    "beta": 0.9633952045177315,
+    "annualized_arithmetic_alpha": 0.09776180669887388
   },
   "first_execution_date": "2025-05-07",
   "last_45_days": {
     "strategy": {
       "observations": 45,
-      "total_return": -0.14115624785608027,
-      "cagr": -0.5734997407400599,
-      "annualized_volatility": 0.204352414834637,
-      "sharpe": -4.062963408931888,
-      "max_drawdown": -0.16347038644220413
+      "total_return": -0.13054938190194676,
+      "cagr": -0.5431521818408039,
+      "annualized_volatility": 0.2427897908191732,
+      "sharpe": -3.103267618699643,
+      "max_drawdown": -0.1605885003977624
     },
     "benchmark": {
       "observations": 45,
@@ -64,10 +64,10 @@
       "sharpe": -3.9252256766970097,
       "max_drawdown": -0.16316450549527073
     },
-    "geometric_excess_return": -0.016675319938122546,
-    "information_ratio": -0.5837328530287383,
-    "beta": 0.7469790432721827,
-    "annualized_arithmetic_alpha": -0.27795347252266045
+    "geometric_excess_return": -0.004531093418722043,
+    "information_ratio": -0.08822018054099569,
+    "beta": 0.9740762182930203,
+    "annualized_arithmetic_alpha": -0.033201124682659025
   },
   "recent_start": "2026-04-23",
   "recent_end": "2026-06-30"

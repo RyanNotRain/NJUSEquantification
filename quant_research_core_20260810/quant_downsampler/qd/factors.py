@@ -20,6 +20,17 @@ from pathlib import Path
 from .config import OUTPUT_DIR
 
 
+# The prompt asks for the supplied example factor plus one to three original
+# factors.  Keep this four-factor set as the formal answer; the remaining
+# factors produced by ``compute_all_factors`` are explicitly extensions.
+REQUIRED_FACTOR_NAMES: tuple[str, ...] = (
+    "example_factor",
+    "momentum_20d",
+    "buy_sell_imbalance",
+    "volume_price_corr_20d",
+)
+
+
 def load_daily_data(data_dir: Path | None = None) -> dict[str, pd.DataFrame]:
     """加载日频数据,返回 {metric_name: DataFrame}。
 
@@ -62,7 +73,10 @@ def compute_example_factor(amount: pd.DataFrame) -> pd.DataFrame:
         if w == 1:
             ma_list.append(amount)
         else:
-            ma_list.append(amount.rolling(window=w, min_periods=1).mean())
+            # A "20-day mean" is only defined after 20 observations.  Using
+            # min_periods=1 silently turned the first 19 rows into shorter,
+            # differently defined factors.
+            ma_list.append(amount.rolling(window=w, min_periods=w).mean())
 
     # 将 4 个 MA 沿时间轴堆叠,计算每行每列的标准差
     # ma_list[i] 形状: (T, N_stocks)
@@ -79,6 +93,16 @@ def compute_example_factor(amount: pd.DataFrame) -> pd.DataFrame:
         columns=amount.columns,
     )
     return factor
+
+
+def select_required_factors(
+    factors: dict[str, pd.DataFrame],
+) -> dict[str, pd.DataFrame]:
+    """Return the example factor and exactly three prompt-compliant additions."""
+    missing = [name for name in REQUIRED_FACTOR_NAMES if name not in factors]
+    if missing:
+        raise KeyError(f"missing required factors: {missing}")
+    return {name: factors[name] for name in REQUIRED_FACTOR_NAMES}
 
 
 # ---------------------------------------------------------------------------

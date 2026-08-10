@@ -30,18 +30,20 @@ py -3 -m unittest discover -v
 py -3 scripts\run_step1.py
 py -3 scripts\smoke_test.py
 
-# Task 2–3：因子、IC、年化 IR、ICIR、分层与稳定性
+# Task 2–3：正式4因子＋扩展10因子、IC/Rank指标、Q1–Q5五条净值曲线
 py -3 scripts\run_factor_eval.py --save
 py -3 -m scripts.run_factor_robustness --iterations 2000 --block-length 5
 
 # 因子相关性聚类、代表因子冻结、截面正交化与同区间严格回测
 py -3 -m scripts.run_factor_independence --calibration-days 120 --correlation-threshold 0.60
 
-# Task 4：严格历史 IC 回测
-py -3 scripts\run_task4_strict.py --lookback 60 --top-n 10
+# Task 4：先跑题目正式4因子，再跑10因子扩展对照
+py -3 scripts\run_task4_strict.py --factor-set required --lookback 60 --top-n 10 --out ..\output\backtest_required
+py -3 scripts\run_task4_strict.py --factor-set extended --lookback 60 --top-n 10 --out ..\output\backtest_strict
 
-# Task 4：等权市场基准、超额净值和最近 45 日相对表现
-py -3 -m scripts.run_strategy_analysis --task4-only --recent-days 45
+# Task 4：同执行价格的等权市场基准、超额净值和最近45日表现
+py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_required --recent-days 45
+py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_strict --recent-days 45
 py -3 -m scripts.run_task4_robustness
 
 # 因子收益率回归和直接夏普优化

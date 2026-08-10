@@ -17,6 +17,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recent-days", type=int, default=45)
     parser.add_argument("--sell-fee-bps", type=float, default=5.0)
+    parser.add_argument(
+        "--task4-dir", default="backtest_strict",
+        help="Task 4 output directory under project/output",
+    )
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--task4-only", action="store_true")
     scope.add_argument("--task5-only", action="store_true")
@@ -29,7 +33,7 @@ def main() -> None:
     result = {}
     if not args.task5_only:
         result["task4_benchmark"] = run_task4_benchmark_analysis(
-            recent_days=args.recent_days
+            recent_days=args.recent_days, backtest_dir=args.task4_dir,
         )
     if not args.task4_only:
         result["task5_strategy"] = run_lstm_strategy_analysis(

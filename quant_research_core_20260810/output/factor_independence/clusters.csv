@@ -1,5 +1,5 @@
 cluster_id,factor,representative,selected,available_ic_days,mean_ic,ic_std,absolute_icir
-1,example_factor,example_factor,True,117.0000000000,-0.0588839281,0.1071292283,0.5496532460
+1,example_factor,example_factor,True,99.0000000000,-0.0593472765,0.1087724122,0.5456096388
 2,momentum_5d,momentum_10d,False,113.0000000000,-0.0518223821,0.1534136814,0.3377950494
 2,momentum_10d,momentum_10d,True,108.0000000000,-0.0552224698,0.1540755146,0.3584117173
 2,momentum_20d,momentum_10d,False,98.0000000000,-0.0481295611,0.1406076412,0.3422969102
