@@ -4,6 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from qd.config import OUTPUT_DIR
 from qd.strategy_analysis import (
@@ -21,6 +27,10 @@ def main() -> None:
         "--task4-dir", default="backtest_strict",
         help="Task 4 output directory under project/output",
     )
+    parser.add_argument(
+        "--task4-strategy", choices=("adaptive_close", "adaptive_open", "both"),
+        default="both", help="Task 4 strategy to compare; default regenerates both",
+    )
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--task4-only", action="store_true")
     scope.add_argument("--task5-only", action="store_true")
@@ -32,9 +42,18 @@ def main() -> None:
 
     result = {}
     if not args.task5_only:
-        result["task4_benchmark"] = run_task4_benchmark_analysis(
-            recent_days=args.recent_days, backtest_dir=args.task4_dir,
+        strategy_names = (
+            ("adaptive_close", "adaptive_open")
+            if args.task4_strategy == "both" else (args.task4_strategy,)
         )
+        result["task4_benchmarks"] = {
+            strategy_name: run_task4_benchmark_analysis(
+                strategy_name=strategy_name,
+                recent_days=args.recent_days,
+                backtest_dir=args.task4_dir,
+            )
+            for strategy_name in strategy_names
+        }
     if not args.task4_only:
         result["task5_strategy"] = run_lstm_strategy_analysis(
             sell_fee_bps=args.sell_fee_bps

@@ -197,12 +197,27 @@
         "full_period_geometric_excess": {
           "adaptive_close": 0.11997459717823844,
           "adaptive_open": 0.4063867476217504
+        },
+        "full_period_cumulative_return_spread": {
+          "adaptive_close": 0.12838314673836582,
+          "adaptive_open": 0.4414213047454445
         }
       },
       "benchmark_analysis": {
         "full_excess_return": 0.020904793147953127,
         "post_warmup_excess_return": 0.005103438209969946,
         "last_45_day_excess_return": -0.016675319938122546
+      },
+      "excess_significance": {
+        "method": "paired circular moving-block bootstrap of synchronized strategy/market daily returns",
+        "rows": 12,
+        "required_open_post_warmup_geometric_excess": 0.4244538147,
+        "required_open_post_warmup_ci": [
+          0.0604433587,
+          0.9126211393
+        ],
+        "required_open_one_sided_pvalue": 0.0083983203,
+        "required_close_ci_crosses_zero": true
       },
       "turnover_cost_robustness": {
         "rows": 8,
@@ -278,6 +293,18 @@
         "ridge_t1_excess_vs_matched_market": 0.0069375777,
         "compact_t1_lstm_return_spearman_ic": -0.017006283539756282,
         "compact_t1_lstm_excess_vs_matched_market": -0.0808296701993032
+      },
+      "direct_market_excess_target": {
+        "selection_frozen_before_test": true,
+        "test_rows": 5310,
+        "target_metric_rows": 4,
+        "strategy_rows": 4,
+        "raw_ridge_geometric_excess": 0.0069375777,
+        "market_excess_histgb_geometric_excess": 0.0048570038,
+        "market_excess_target_spearman_ic": {
+          "ridge": -0.0965881295,
+          "hist_gradient_boosting_regressor": -0.0842419853
+        }
       },
       "feature_and_component_independence": {
         "selection_split": "train",

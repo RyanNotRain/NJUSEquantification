@@ -230,6 +230,7 @@ def strategy_metrics(path: pd.DataFrame, daily_sleeves: bool) -> dict[str, float
             "periods": 0, "active_periods": 0, "coverage": 0.0,
             "gross_total_return": 0.0, "net_total_return": 0.0,
             "matched_market_total_return": 0.0,
+            "cumulative_return_gap_vs_matched_market": 0.0,
             "excess_vs_matched_market": 0.0, "mean_selected_names": 0.0,
         }
     evaluated = path.copy()
@@ -247,6 +248,7 @@ def strategy_metrics(path: pd.DataFrame, daily_sleeves: bool) -> dict[str, float
         "gross_total_return": gross_growth - 1.0,
         "net_total_return": net_growth - 1.0,
         "matched_market_total_return": market_growth - 1.0,
+        "cumulative_return_gap_vs_matched_market": net_growth - market_growth,
         "excess_vs_matched_market": net_growth / market_growth - 1.0,
         "mean_selected_names": float(path.loc[path["active"].eq(1), "selected_names"].mean())
         if path["active"].any() else 0.0,

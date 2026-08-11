@@ -50,6 +50,10 @@ class TradableReturnResearchTests(unittest.TestCase):
         self.assertAlmostEqual(
             metrics["excess_vs_matched_market"], strategy_growth / market_growth - 1
         )
+        self.assertAlmostEqual(
+            metrics["cumulative_return_gap_vs_matched_market"],
+            strategy_growth - market_growth,
+        )
 
 
 if __name__ == "__main__":

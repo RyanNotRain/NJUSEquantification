@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from qd.strategy_analysis import (
+    _build_lstm_t1_comparison,
     aggregate_signal_strategy,
     aggregate_t1_daily_strategy,
     performance_metrics,
@@ -24,6 +25,24 @@ class StrategyAnalysisTests(unittest.TestCase):
         benchmark = pd.Series([0.05, 0.00])
         metrics = relative_metrics(strategy, benchmark)
         self.assertAlmostEqual(metrics["geometric_excess_return"], 1.10 / 1.05 - 1.0)
+        self.assertAlmostEqual(metrics["cumulative_return_spread"], 1.10 - 1.05)
+
+    def test_t1_comparison_contains_market_subtraction_path(self) -> None:
+        returns = pd.DataFrame({
+            "five_stock_market_return": [0.01, -0.02],
+        })
+        for strategy in ("all_up", "balanced_up", "strict_up"):
+            prefix = f"{strategy}__fee_5bp"
+            returns[f"{prefix}__net_return"] = [0.02, 0.00]
+            returns[f"{prefix}__exposure_matched_market_return"] = [0.01, -0.01]
+        comparison = _build_lstm_t1_comparison(returns, 5.0)
+        prefix = "balanced_up__fee_5bp"
+        expected_strategy_nav = 1.02
+        expected_matched_nav = 1.01 * 0.99
+        self.assertAlmostEqual(
+            comparison.iloc[-1][f"{prefix}__return_gap_vs_matched_market"],
+            expected_strategy_nav - expected_matched_nav,
+        )
 
     def test_signal_strategy_charges_fee_only_when_active(self) -> None:
         samples = pd.DataFrame({

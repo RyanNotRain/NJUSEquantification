@@ -23,13 +23,13 @@ if errorlevel 1 exit /b %errorlevel%
 call run.bat run_strategy_analysis.py --task4-only --task4-dir backtest_strict --recent-days 45
 if errorlevel 1 exit /b %errorlevel%
 
+call run.bat run_task4_excess_significance.py --iterations 5000 --block-length 5 --rolling-window 60
+if errorlevel 1 exit /b %errorlevel%
+
 call run.bat run_task4_robustness.py
 if errorlevel 1 exit /b %errorlevel%
 
 call run.bat run_factor_independence.py
-if errorlevel 1 exit /b %errorlevel%
-
-call run.bat ..\build_task4_report.py
 if errorlevel 1 exit /b %errorlevel%
 
 call run.bat run_factor_models.py --out ..\output\factor_models_aligned
@@ -52,6 +52,8 @@ if /I "%~1"=="--with-lstm" (
     call run.bat run_lstm_magnitude.py --epochs 12 --return-loss-weight 0.25 --sell-fee-bps 5 --device cpu --overwrite
     if errorlevel 1 exit /b %errorlevel%
     call run.bat run_tradable_return_research.py --sell-fee-bps 5
+    if errorlevel 1 exit /b %errorlevel%
+    call run.bat run_t1_excess_return_research.py --sell-fee-bps 5
     if errorlevel 1 exit /b %errorlevel%
     call run.bat run_tradable_lstm.py --epochs 8 --sell-fee-bps 5 --device cpu
     if errorlevel 1 exit /b %errorlevel%

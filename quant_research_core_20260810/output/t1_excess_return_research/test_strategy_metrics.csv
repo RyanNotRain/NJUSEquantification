@@ -1,0 +1,5 @@
+target,model,threshold_bps,top_k,interval_minutes,selection_source,periods,active_periods,coverage,gross_total_return,net_total_return,matched_market_total_return,cumulative_return_gap_vs_matched_market,excess_vs_matched_market,mean_selected_names
+raw_return,ridge,57.4742698669,1,60,validation_only,9,26,0.9629629630,-0.1029040519,-0.1068327985,-0.1129865234,0.0061537249,0.0069375777,1.0000000000
+raw_return,hist_gradient_boosting_regressor,157.9908497959,1,30,validation_only,9,8,0.1777777778,-0.0074790555,-0.0082768076,-0.0016214969,-0.0066553107,-0.0066661198,1.0000000000
+market_excess_return,ridge,29.8036075592,2,15,validation_only,9,81,1.0000000000,-0.1212214844,-0.1252257698,-0.1223149352,-0.0029108346,-0.0033164910,1.8271604938
+market_excess_return,hist_gradient_boosting_regressor,0.0000000000,1,60,validation_only,9,27,1.0000000000,-0.1119512794,-0.1159933881,-0.1202662582,0.0042728701,0.0048570038,1.0000000000

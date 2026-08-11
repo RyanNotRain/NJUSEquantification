@@ -1,9 +1,9 @@
 # 运行说明
 
-以下命令均在 `project/quant_downsampler` 目录运行。本机推荐使用 Python Launcher：
+以下命令均在 `project/quant_downsampler` 目录运行。请先进入自己机器上的项目目录：
 
 ```powershell
-cd "E:\\屄养的不学了\\笔试\\兆信\\project\\quant_downsampler"
+cd "<项目所在位置>\project\quant_downsampler"
 ```
 
 ## 一键运行
@@ -41,9 +41,14 @@ py -3 -m scripts.run_factor_independence --calibration-days 120 --correlation-th
 py -3 scripts\run_task4_strict.py --factor-set required --lookback 60 --top-n 10 --out ..\output\backtest_required
 py -3 scripts\run_task4_strict.py --factor-set extended --lookback 60 --top-n 10 --out ..\output\backtest_strict
 
-# Task 4：同执行价格的等权市场基准、超额净值和最近45日表现
-py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_required --recent-days 45
-py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_strict --recent-days 45
+# Task 4：同执行价格的等权市场基准、累计收益率差、几何超额和最近45日表现
+# 默认一次同时重建 adaptive_close 与 adaptive_open
+py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_required --task4-strategy both --recent-days 45
+py -3 -m scripts.run_strategy_analysis --task4-only --task4-dir backtest_strict --task4-strategy both --recent-days 45
+
+# Task 4：成对5日移动区块 Bootstrap 与60日滚动超额、Beta、IR
+py -3 -m scripts.run_task4_excess_significance --iterations 5000 --block-length 5 --rolling-window 60
+
 py -3 -m scripts.run_task4_robustness
 
 # 因子收益率回归和直接夏普优化
@@ -67,6 +72,9 @@ py -3 -m scripts.run_lstm_magnitude --epochs 12 --return-loss-weight 0.25 --sell
 
 # 1/5/15/30 分钟与 T+1 可交易收益标签、强回归基线和低频 Top-K
 py -3 -m scripts.run_tradable_return_research --sell-fee-bps 5
+
+# 同一 T+1 策略引擎下比较原始收益标签与直接市场超额标签
+py -3 -m scripts.run_t1_excess_return_research --sell-fee-bps 5
 
 # 在验证集筛出的 T+1 目标上训练紧凑多任务 LSTM
 py -3 -m scripts.run_tradable_lstm --epochs 8 --sell-fee-bps 5 --device cpu
@@ -100,4 +108,4 @@ $env:QD_ADJFACTOR_PATH = "D:\\your_data\\adjfactor.pkl"
 $env:QD_OUTPUT_DIR = "D:\\your_output"
 ```
 
-正式结果在 `E:\\屄养的不学了\\笔试\\兆信\\project\\output`。
+正式结果默认写入项目相对路径 `../output`。

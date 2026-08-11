@@ -48,6 +48,7 @@ def relative_metrics(strategy: pd.Series, benchmark: pd.Series) -> dict[str, flo
     return {
         "strategy": performance_metrics(aligned["strategy"]),
         "benchmark": performance_metrics(aligned["benchmark"]),
+        "cumulative_return_spread": float(strategy_growth - benchmark_growth),
         "geometric_excess_return": float(strategy_growth / benchmark_growth - 1.0),
         "information_ratio": float(excess.mean() / tracking_error * np.sqrt(252.0))
         if tracking_error > 0 else 0.0,
@@ -81,7 +82,14 @@ def run_task4_benchmark_analysis(
     comparison["excess_return"] = comparison["strategy_return"] - comparison["benchmark_return"]
     comparison["strategy_nav"] = (1.0 + comparison["strategy_return"]).cumprod()
     comparison["benchmark_nav"] = (1.0 + comparison["benchmark_return"]).cumprod()
+    comparison["strategy_cumulative_return"] = comparison["strategy_nav"] - 1.0
+    comparison["benchmark_cumulative_return"] = comparison["benchmark_nav"] - 1.0
+    comparison["cumulative_return_spread"] = (
+        comparison["strategy_cumulative_return"]
+        - comparison["benchmark_cumulative_return"]
+    )
     comparison["excess_nav"] = comparison["strategy_nav"] / comparison["benchmark_nav"]
+    comparison["geometric_excess_return"] = comparison["excess_nav"] - 1.0
 
     recent_count = min(int(recent_days), len(comparison))
     selections_path = root / backtest_dir / f"{strategy_name}_selections.csv"
@@ -111,11 +119,6 @@ def run_task4_benchmark_analysis(
     }
 
     target = root / backtest_dir
-    comparison.to_csv(target / "benchmark_comparison_daily.csv", float_format="%.10f")
-    (target / "benchmark_metrics.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    _plot_task4_benchmark(comparison, target / "benchmark_comparison.png")
     comparison.to_csv(
         target / f"benchmark_comparison_{strategy_name}_daily.csv", float_format="%.10f",
     )
@@ -124,6 +127,7 @@ def run_task4_benchmark_analysis(
     )
     _plot_task4_benchmark(
         comparison, target / f"benchmark_comparison_{strategy_name}.png",
+        strategy_name=strategy_name,
     )
     return summary
 
@@ -325,6 +329,9 @@ def run_lstm_strategy_analysis(
     metrics["excess_vs_five_stock_market"] = (
         (1.0 + metrics["net_total_return"]) / (1.0 + market_total) - 1.0
     )
+    metrics["cumulative_return_gap_vs_five_stock_market"] = (
+        metrics["net_total_return"] - market_total
+    )
     metrics.to_csv(run_dir / "strategy_metrics.csv", index=False, float_format="%.10f")
 
     returns = pd.DataFrame(index=market.index)
@@ -360,15 +367,28 @@ def run_lstm_strategy_analysis(
                 "net_total_return": strategy_growth - 1.0,
                 "five_stock_market_total_return": full_market_growth - 1.0,
                 "excess_vs_full_market": strategy_growth / full_market_growth - 1.0,
+                "cumulative_return_gap_vs_full_market": (
+                    strategy_growth - full_market_growth
+                ),
                 "exposure_matched_market_total_return": matched_market_growth - 1.0,
                 "excess_vs_exposure_matched_market": (
                     strategy_growth / matched_market_growth - 1.0
+                ),
+                "cumulative_return_gap_vs_exposure_matched_market": (
+                    strategy_growth - matched_market_growth
                 ),
             })
     t1_metrics = pd.DataFrame(t1_rows)
     t1_metrics.to_csv(run_dir / "t1_strategy_metrics.csv", index=False, float_format="%.10f")
     t1_returns.index.name = "signal_date"
     t1_returns.to_csv(run_dir / "t1_strategy_returns.csv", float_format="%.10f")
+    t1_comparison = _build_lstm_t1_comparison(t1_returns, sell_fee_bps)
+    t1_comparison.to_csv(
+        run_dir / "t1_strategy_comparison_daily.csv", float_format="%.10f"
+    )
+    _plot_lstm_t1_strategies(
+        t1_comparison, run_dir / "t1_strategy_nav_and_return_gap.png", sell_fee_bps,
+    )
 
     summary = {
         "status": "completed",
@@ -425,7 +445,9 @@ def run_lstm_strategy_analysis(
 - long-short 仅用于研究诊断，不作为 A 股可执行主结果。
 
 `strategy_metrics.csv` 保存价格时点代理结果，`t1_strategy_metrics.csv` 保存 T+1 小样本结果；
-两者都必须与市场及相同持仓覆盖的市场基准一起解释，不能仅凭绝对收益下结论。
+`t1_strategy_comparison_daily.csv` 和 `t1_strategy_nav_and_return_gap.png` 进一步保存
+真正 T+1 策略相对同覆盖市场的逐日净值与累计收益率直接差。所有结果都必须与
+市场及相同持仓覆盖的市场基准一起解释，不能仅凭绝对收益下结论。
 """,
         encoding="utf-8",
     )
@@ -497,8 +519,14 @@ def run_lstm_model_strategy_comparison(
                         "t1_settled_days": int(len(t1)),
                         "t1_net_total_return": strategy_growth - 1.0,
                         "t1_full_market_total_return": full_market_growth - 1.0,
+                        "t1_cumulative_return_gap_vs_full_market": (
+                            strategy_growth - full_market_growth
+                        ),
                         "t1_excess_vs_full_market": strategy_growth / full_market_growth - 1.0,
                         "t1_exposure_matched_market_return": matched_growth - 1.0,
+                        "t1_cumulative_return_gap_vs_exposure_matched_market": (
+                            strategy_growth - matched_growth
+                        ),
                         "t1_excess_vs_exposure_matched_market": strategy_growth / matched_growth - 1.0,
                     })
                 rows.append(row)
@@ -520,26 +548,134 @@ def run_lstm_model_strategy_comparison(
     return report
 
 
-def _plot_task4_benchmark(comparison: pd.DataFrame, path: Path) -> None:
+def _plot_task4_benchmark(
+    comparison: pd.DataFrame, path: Path, strategy_name: str,
+) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
-    axes[0].plot(comparison.index, comparison["strategy_nav"], label="adaptive_close", lw=1.5)
-    axes[0].plot(comparison.index, comparison["benchmark_nav"], label="300-stock equal weight", lw=1.3)
-    axes[0].axhline(1.0, color="grey", lw=0.8, ls=":")
-    axes[0].set_ylabel("Normalized NAV")
-    axes[0].set_title("Task 4 Strategy vs Equal-Weight Market")
+    from matplotlib.ticker import PercentFormatter
+
+    execution = strategy_name.rsplit("_", 1)[-1]
+    benchmark_label = f"300-stock equal weight ({execution})"
+    fig, axes = plt.subplots(3, 1, figsize=(11, 9), sharex=True)
+    axes[0].plot(
+        comparison.index, comparison["strategy_cumulative_return"],
+        label=strategy_name, lw=1.5,
+    )
+    axes[0].plot(
+        comparison.index, comparison["benchmark_cumulative_return"],
+        label=benchmark_label, lw=1.3,
+    )
+    axes[0].axhline(0.0, color="grey", lw=0.8, ls=":")
+    axes[0].set_ylabel("Cumulative return")
+    axes[0].yaxis.set_major_formatter(PercentFormatter(1.0))
+    axes[0].set_title(f"Task 4: {strategy_name} vs Same-Price Market")
     axes[0].legend()
     axes[0].grid(alpha=0.25)
-    axes[1].plot(comparison.index, comparison["excess_nav"], color="#B45309", lw=1.5)
-    axes[1].axhline(1.0, color="grey", lw=0.8, ls=":")
-    axes[1].set_ylabel("Relative NAV")
-    axes[1].set_title("Strategy / Benchmark")
+    axes[1].plot(
+        comparison.index, comparison["cumulative_return_spread"],
+        color="#B45309", lw=1.5,
+    )
+    axes[1].axhline(0.0, color="grey", lw=0.8, ls=":")
+    axes[1].set_ylabel("Return gap")
+    axes[1].yaxis.set_major_formatter(PercentFormatter(1.0))
+    axes[1].set_title("Arithmetic Gap: Strategy Cumulative Return - Market Cumulative Return")
     axes[1].grid(alpha=0.25)
+    axes[2].plot(
+        comparison.index, comparison["geometric_excess_return"],
+        color="#7C3AED", lw=1.5,
+    )
+    axes[2].axhline(0.0, color="grey", lw=0.8, ls=":")
+    axes[2].set_ylabel("Geometric excess")
+    axes[2].yaxis.set_major_formatter(PercentFormatter(1.0))
+    axes[2].set_title("Geometric Excess: Strategy NAV / Market NAV - 1")
+    axes[2].grid(alpha=0.25)
     fig.tight_layout()
     fig.savefig(path, dpi=160)
+    plt.close(fig)
+
+
+def _build_lstm_t1_comparison(
+    returns: pd.DataFrame, sell_fee_bps: float,
+) -> pd.DataFrame:
+    """Add auditable NAV and market-subtraction paths to the T+1 return table."""
+    fee = float(sell_fee_bps)
+    comparison = returns.copy()
+    comparison.index = pd.to_datetime(comparison.index)
+    full_market_nav = (1.0 + comparison["five_stock_market_return"]).cumprod()
+    comparison["five_stock_market_nav"] = full_market_nav
+    for strategy in ("all_up", "balanced_up", "strict_up"):
+        prefix = f"{strategy}__fee_{fee:g}bp"
+        strategy_nav = (1.0 + comparison[f"{prefix}__net_return"]).cumprod()
+        matched_nav = (
+            1.0 + comparison[f"{prefix}__exposure_matched_market_return"]
+        ).cumprod()
+        comparison[f"{prefix}__strategy_nav"] = strategy_nav
+        comparison[f"{prefix}__matched_market_nav"] = matched_nav
+        comparison[f"{prefix}__return_gap_vs_full_market"] = (
+            strategy_nav - full_market_nav
+        )
+        comparison[f"{prefix}__return_gap_vs_matched_market"] = (
+            strategy_nav - matched_nav
+        )
+        comparison[f"{prefix}__geometric_excess_vs_matched_market"] = (
+            strategy_nav / matched_nav - 1.0
+        )
+    return comparison
+
+
+def _plot_lstm_t1_strategies(
+    comparison: pd.DataFrame, path: Path, sell_fee_bps: float,
+) -> None:
+    """Plot the genuinely T+1 strategy and its arithmetic gap to matched market."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.dates as mdates
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import PercentFormatter
+
+    fee = float(sell_fee_bps)
+    fig, axes = plt.subplots(2, 3, figsize=(15, 7), sharex=True)
+    for column, (strategy, color) in enumerate((
+        ("all_up", "#2563EB"),
+        ("balanced_up", "#059669"),
+        ("strict_up", "#D97706"),
+    )):
+        prefix = f"{strategy}__fee_{fee:g}bp"
+        strategy_return = comparison[f"{prefix}__strategy_nav"] - 1.0
+        matched_return = comparison[f"{prefix}__matched_market_nav"] - 1.0
+        axes[0, column].plot(
+            comparison.index, strategy_return, label=strategy, color=color, lw=1.5,
+        )
+        axes[0, column].plot(
+            comparison.index, matched_return, label="exposure-matched market",
+            color="black", lw=1.2, ls="--",
+        )
+        axes[0, column].axhline(0.0, color="grey", lw=0.8, ls=":")
+        axes[0, column].set_title(f"{strategy}: T+1 cumulative return")
+        axes[0, column].yaxis.set_major_formatter(PercentFormatter(1.0))
+        axes[0, column].grid(alpha=0.25)
+        axes[0, column].legend(fontsize=8)
+
+        gap = comparison[f"{prefix}__return_gap_vs_matched_market"]
+        axes[1, column].plot(comparison.index, gap, color=color, lw=1.5)
+        axes[1, column].axhline(0.0, color="grey", lw=0.8, ls=":")
+        axes[1, column].set_title("Strategy return - matched market return")
+        axes[1, column].yaxis.set_major_formatter(PercentFormatter(1.0))
+        axes[1, column].xaxis.set_major_locator(mdates.DayLocator(interval=2))
+        axes[1, column].xaxis.set_major_formatter(mdates.DateFormatter("%m-%d"))
+        axes[1, column].tick_params(axis="x", labelrotation=30)
+        axes[1, column].grid(alpha=0.25)
+    axes[0, 0].set_ylabel("Cumulative return")
+    axes[1, 0].set_ylabel("Arithmetic return gap")
+    fig.suptitle(
+        f"LSTM A-share T+1 Diagnostic (sell fee = {fee:g} bp, 9 settled days)",
+        y=1.01,
+    )
+    fig.tight_layout()
+    fig.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(fig)
 
 

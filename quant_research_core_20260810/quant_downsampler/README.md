@@ -2,13 +2,15 @@
 
 本目录包含题目 Task 1–5 的可复现实现。原始逐笔数据位于工作区 `data/TRADE`，正式结果统一写入 `project/output`；路径由 `qd/config.py` 相对项目位置自动解析，也可通过环境变量覆盖。
 
+正式文字交付物只保留项目根目录的 `兆信基金量化研究中期报告_最终版.md`；`README.md` 负责快速导航，`PROJECT_STATUS.md` 负责验收状态，避免多份报告出现数字和口径不一致。
+
 ## 当前正式结论
 
 - Task 1：完成 302 个交易日、300 只股票的日频与分钟频降采样。日频和分钟频均包含 OHLC、成交量、成交笔数、成交额、主买/主卖量额共 11 个字段；OHLC 已使用 `adjfactor.pkl` 复权。
 - Task 2–3：正式答题集合严格限定为题目示例因子加 3 个自建因子（20 日动量、主买卖失衡、20 日量价相关）；其余 6 个因子只作扩展。示例因子的 5/10/20 日均值必须满足完整窗口。除 IC、年化 IR、ICIR 和 Rank 指标外，现已保存 Q1–Q5 逐日收益、五条累计净值曲线、分层绩效和单调性指标。
-- Task 4：先用上述正式 4 因子完成收盘/次日开盘两套严格历史 IC 回测。`adaptive_close` 总收益 19.85%，相对同口径等权市场全期几何超额 12.00%；`adaptive_open` 总收益 52.76%，相对开盘等权市场超额 40.64%。两者最近 45 日均略跑输市场，且整个样本已被反复查看，不能视为盲测。10 因子扩展版 `adaptive_close` 总收益为 9.25%，缓冲版为 11.33%。冻结后聚类精选的几何超额为 21.46%，仍需 walk-forward 确认。
+- Task 4：先用上述正式 4 因子完成收盘/次日开盘两套严格历史 IC 回测。`adaptive_close` 总收益 19.85%，比同口径市场高 12.84 个百分点（几何超额 12.00%）；`adaptive_open` 总收益 52.76%，高 44.14 个百分点（几何超额 40.64%）。首次实际持仓后的 5 日区块 Bootstrap 显示，open 几何超额为 42.45%，95% 区间 6.04%–91.26%、单侧 p=0.008；close 为 10.26%，但区间 -15.17%–41.11% 跨零。两者最近 45 日均略跑输市场，且整个样本已被反复查看，不能视为盲测。10 因子扩展版没有显著超额；冻结后聚类精选仍需 walk-forward 确认。
 - 因子学习：收益率回归和直接夏普优化在全滚动期为正，但最近 45 日夏普均小于 -3，说明因子方向在近期失效。
-- Task 5：正式模型为三个独立 LSTM 的概率融合。可交易 T+1 基线中 Ridge 的同覆盖超额为 +0.69%，原25特征紧凑 LSTM 为 -8.08%。训练集聚类精选19个输入后，收益 Rank IC 从 -0.017 提高到 +0.065、同覆盖超额改善至 -0.67%。另将原题 `Time/Price/Volume/BSFlag` 映射为四个平稳特征重训，Accuracy 45.54%、Rank IC -0.121、同覆盖超额 -2.40%；它好于原25特征的相对收益，但明显弱于19特征，说明问题是重复输入而非所有新增信息都有害。
+- Task 5：正式模型为三个独立 LSTM 的概率融合。真正 T+1 的 balanced 策略扣费后为 -4.27%，同覆盖市场 -4.61%，直接收益率差 +0.34 个百分点（几何超额 +0.36%），现已保存逐日曲线。可交易 T+1 基线中 Ridge 的同覆盖超额为 +0.69%，原25特征紧凑 LSTM 为 -8.08%。训练集聚类精选19个输入后，收益 Rank IC 从 -0.017 提高到 +0.065、同覆盖超额改善至 -0.67%。另将原题 `Time/Price/Volume/BSFlag` 映射为四个平稳特征重训，Accuracy 45.54%、Rank IC -0.121、同覆盖超额 -2.40%。直接把标签改成“个股 T+1 收益－5股市场收益”后，Ridge/HistGB 测试 Rank IC 反而为 -0.097/-0.084；最好的直接超额模型仅取得 +0.49% 几何超额，低于原始收益 Ridge 的 +0.69%，因此保留为反证，不替换正式模型。
 
 ## 目录与入口
 
@@ -21,13 +23,15 @@
 | Task 4 正式 4 因子 | `scripts/run_task4_strict.py --factor-set required` | `../output/backtest_required` |
 | Task 4 扩展 10 因子 | `scripts/run_task4_strict.py --factor-set extended` | `../output/backtest_strict` |
 | Task 4 换手/成本 | `scripts/run_task4_robustness.py` | `../output/backtest_robustness` |
-| Task 4/5 相对收益 | `scripts/run_strategy_analysis.py` | 基准、超额收益与 LSTM 策略诊断 |
+| Task 4/5 相对收益 | `scripts/run_strategy_analysis.py` | close/open 基准、累计收益率差、几何超额与 LSTM T+1 策略诊断 |
+| Task 4 超额显著性 | `scripts/run_task4_excess_significance.py` | `../output/task4_excess_significance`（区块 Bootstrap 与滚动超额/β） |
 | 因子学习 | `scripts/run_factor_models.py` | `../output/factor_models_*` |
 | Task 5 基线 | `scripts/run_lstm.py` | `../output/lstm_next_minute` |
 | Task 5 三组件 | `scripts/run_lstm_ensemble.py` | `../output/lstm_ensemble` |
 | Task 5 强基线/校准 | `scripts/run_lstm_baselines.py` | `../output/lstm_baselines` |
 | Task 5 涨跌幅多任务 | `scripts/run_lstm_magnitude.py` | `../output/lstm_magnitude` |
 | Task 5 多期限可交易收益 | `scripts/run_tradable_return_research.py` | `../output/tradable_return_research` |
+| Task 5 直接超额标签 | `scripts/run_t1_excess_return_research.py` | `../output/t1_excess_return_research` |
 | Task 5 T+1 紧凑 LSTM | `scripts/run_tradable_lstm.py` | `../output/tradable_lstm` |
 | Task 5 特征/组件独立性 | `scripts/run_lstm_feature_independence.py` | `../output/lstm_feature_independence` |
 | Task 5 原题四字段基线 | `scripts/run_lstm_minimal_four.py` | `../output/lstm_minimal_four` |
@@ -61,6 +65,8 @@
 涨跌幅实验不把方向标签细分为更多档，而是在同一 LSTM 编码器上增加 signed-return 回归头。分类损失保留所有平盘样本；回归损失对大波动给予较高但有上限的权重，并只用训练集拟合缩放和截尾。验证集按收益 Rank IC 选择 checkpoint 并冻结收益阈值，测试集仍只打开一次。该模型只作探索性增强，不替换正式三组件模型。
 
 可交易收益研究另外构造 `open[t+1]` 入场的 1/5/15/30 分钟标签和次交易日同分钟开盘退出的 T+1 标签。Ridge/HistGB 的超参数、Top-K、最低预测收益和再平衡间隔均在验证集冻结；测试表完整保留全部期限，不按测试收益挑选。验证推荐的 T+1 目标随后用于训练紧凑多任务 LSTM，结果弱于 Ridge，因此不替换简单模型。
+
+直接超额标签实验在相同 5 只股票、60 分钟因果特征和时间切分下，对照预测个股原始 T+1 收益与预测“个股收益减同期 5 股等权市场收益”。模型、阈值、Top-K 和交易间隔均在验证集冻结，测试策略仍以原始可实现收益记账。结果说明小股票池内的同期市场扣除会压缩标签波动，但也可能引入较强噪声，当前不应替换原始收益标签。
 
 ## 快速运行
 

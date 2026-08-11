@@ -129,6 +129,7 @@ def main() -> None:
     ):
         raise AssertionError("prompt-required four-factor Task4 backtest is incomplete")
     required_benchmarks = {}
+    required_spreads = {}
     for strategy_name, execution in (("adaptive_close", "close"), ("adaptive_open", "open")):
         item = json.loads(
             (required_backtest_root / f"benchmark_metrics_{strategy_name}.json")
@@ -136,14 +137,33 @@ def main() -> None:
         )
         if item.get("strategy") != strategy_name or item.get("execution") != execution:
             raise AssertionError(f"mismatched Task4 benchmark for {strategy_name}")
+        comparison = pd.read_csv(
+            required_backtest_root
+            / f"benchmark_comparison_{strategy_name}_daily.csv"
+        )
+        required_columns = {
+            "strategy_cumulative_return", "benchmark_cumulative_return",
+            "cumulative_return_spread", "geometric_excess_return",
+        }
+        if (
+            "cumulative_return_spread" not in item["full_period"]
+            or not required_columns.issubset(comparison.columns)
+            or not (required_backtest_root / f"benchmark_comparison_{strategy_name}.png").exists()
+        ):
+            raise AssertionError(
+                f"Task4 arithmetic/geometric benchmark paths are incomplete for {strategy_name}"
+            )
         required_benchmarks[strategy_name] = item["full_period"]["geometric_excess_return"]
+        required_spreads[strategy_name] = item["full_period"]["cumulative_return_spread"]
     checks["task4"]["prompt_required_four_factor_backtest"] = {
         "factor_names": list(REQUIRED_FACTOR_NAMES),
         "strategy_count": int(len(required_backtest)),
         "full_period_geometric_excess": required_benchmarks,
+        "full_period_cumulative_return_spread": required_spreads,
     }
     benchmark = json.loads(
-        (OUTPUT_DIR / "backtest_strict" / "benchmark_metrics.json").read_text(encoding="utf-8")
+        (OUTPUT_DIR / "backtest_strict" / "benchmark_metrics_adaptive_close.json")
+        .read_text(encoding="utf-8")
     )
     if benchmark.get("strategy") != "adaptive_close":
         raise AssertionError("Task4 benchmark analysis does not target adaptive_close")
@@ -159,6 +179,49 @@ def main() -> None:
             "geometric_excess_return"
         ],
         "last_45_day_excess_return": benchmark["last_45_days"]["geometric_excess_return"],
+    }
+    significance_root = OUTPUT_DIR / "task4_excess_significance"
+    significance_summary = json.loads(
+        (significance_root / "summary.json").read_text(encoding="utf-8")
+    )
+    significance = pd.read_csv(significance_root / "bootstrap_summary.csv")
+    required_open_active = significance[
+        significance["factor_set"].eq("required_4")
+        & significance["strategy"].eq("adaptive_open")
+        & significance["period"].eq("from_first_execution")
+    ].iloc[0]
+    required_close_active = significance[
+        significance["factor_set"].eq("required_4")
+        & significance["strategy"].eq("adaptive_close")
+        & significance["period"].eq("from_first_execution")
+    ].iloc[0]
+    if (
+        significance_summary.get("status") != "completed"
+        or len(significance) != 12
+        or required_open_active["geometric_excess_ci_low"] <= 0
+        or required_open_active["one_sided_pvalue_mean_daily_excess_gt_zero"] >= 0.05
+        or not (
+            required_close_active["geometric_excess_ci_low"] < 0
+            < required_close_active["geometric_excess_ci_high"]
+        )
+        or not (significance_root / "bootstrap_excess_ci.png").exists()
+        or not (significance_root / "required_rolling_excess_and_beta.png").exists()
+    ):
+        raise AssertionError("Task4 excess significance or rolling-risk outputs are incomplete")
+    checks["task4"]["excess_significance"] = {
+        "method": significance_summary["method"],
+        "rows": int(len(significance)),
+        "required_open_post_warmup_geometric_excess": float(
+            required_open_active["geometric_excess_return"]
+        ),
+        "required_open_post_warmup_ci": [
+            float(required_open_active["geometric_excess_ci_low"]),
+            float(required_open_active["geometric_excess_ci_high"]),
+        ],
+        "required_open_one_sided_pvalue": float(
+            required_open_active["one_sided_pvalue_mean_daily_excess_gt_zero"]
+        ),
+        "required_close_ci_crosses_zero": True,
     }
     cost_stress = pd.read_csv(OUTPUT_DIR / "backtest_robustness" / "cost_stress.csv")
     if (
@@ -249,6 +312,15 @@ def main() -> None:
         raise AssertionError("LSTM T+1 strategy analysis is incomplete")
     if not t1_metrics["settled_signal_days"].eq(9).all():
         raise AssertionError("LSTM T+1 analysis does not have the expected nine settled days")
+    t1_path = OUTPUT_DIR / "lstm_ensemble" / "t1_strategy_comparison_daily.csv"
+    t1_plot = OUTPUT_DIR / "lstm_ensemble" / "t1_strategy_nav_and_return_gap.png"
+    t1_comparison = pd.read_csv(t1_path)
+    if (
+        "cumulative_return_gap_vs_exposure_matched_market" not in t1_metrics.columns
+        or not any("return_gap_vs_matched_market" in column for column in t1_comparison.columns)
+        or not t1_plot.exists()
+    ):
+        raise AssertionError("LSTM T+1 market-subtraction path or plot is missing")
     checks["task5"] = {
         "status": "passed", "test_windows": 5900,
         "accuracy": lstm_metrics["accuracy"],
@@ -390,6 +462,56 @@ def main() -> None:
         "compact_t1_lstm_excess_vs_matched_market": float(
             tradable_lstm["test_strategy"]["excess_vs_matched_market"]
         ),
+    }
+
+    excess_target_root = OUTPUT_DIR / "t1_excess_return_research"
+    excess_target_freeze = json.loads(
+        (excess_target_root / "selection_frozen_before_test.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    excess_target_summary = json.loads(
+        (excess_target_root / "summary.json").read_text(encoding="utf-8")
+    )
+    excess_target_metrics = pd.read_csv(excess_target_root / "test_target_metrics.csv")
+    excess_target_strategy = pd.read_csv(excess_target_root / "test_strategy_metrics.csv")
+    expected_targets = {"raw_return", "market_excess_return"}
+    if (
+        excess_target_freeze.get("status") != "frozen_before_test"
+        or excess_target_summary.get("status") != "completed"
+        or excess_target_summary.get("test_rows") != 5310
+        or len(excess_target_metrics) != 4
+        or len(excess_target_strategy) != 4
+        or set(excess_target_metrics["target"]) != expected_targets
+        or set(excess_target_metrics["model"]) != required_return_models
+        or set(excess_target_strategy["target"]) != expected_targets
+        or not excess_target_metrics["test_rows"].eq(5310).all()
+        or not (excess_target_root / "target_and_strategy_comparison.png").exists()
+    ):
+        raise AssertionError("direct T+1 market-excess target research is incomplete")
+    raw_ridge = excess_target_strategy[
+        excess_target_strategy["target"].eq("raw_return")
+        & excess_target_strategy["model"].eq("ridge")
+    ].iloc[0]
+    excess_hist = excess_target_strategy[
+        excess_target_strategy["target"].eq("market_excess_return")
+        & excess_target_strategy["model"].eq("hist_gradient_boosting_regressor")
+    ].iloc[0]
+    checks["task5"]["direct_market_excess_target"] = {
+        "selection_frozen_before_test": True,
+        "test_rows": int(excess_target_summary["test_rows"]),
+        "target_metric_rows": int(len(excess_target_metrics)),
+        "strategy_rows": int(len(excess_target_strategy)),
+        "raw_ridge_geometric_excess": float(raw_ridge["excess_vs_matched_market"]),
+        "market_excess_histgb_geometric_excess": float(
+            excess_hist["excess_vs_matched_market"]
+        ),
+        "market_excess_target_spearman_ic": {
+            str(row["model"]): float(row["spearman_ic"])
+            for _, row in excess_target_metrics[
+                excess_target_metrics["target"].eq("market_excess_return")
+            ].iterrows()
+        },
     }
 
     feature_root = OUTPUT_DIR / "lstm_feature_independence"

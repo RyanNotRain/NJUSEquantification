@@ -1,0 +1,206 @@
+{
+  "status": "frozen_before_test",
+  "stocks": [
+    "000012.SZ",
+    "000014.SZ",
+    "000019.SZ",
+    "000020.SZ",
+    "000027.SZ"
+  ],
+  "splits": {
+    "train": [
+      "20250401",
+      "20260531"
+    ],
+    "val": [
+      "20260601",
+      "20260615"
+    ],
+    "test": [
+      "20260616",
+      "20260630"
+    ]
+  },
+  "horizon": "t1_same_minute_open",
+  "targets": {
+    "raw_return": "stock T+1 return",
+    "market_excess_return": "stock T+1 return minus same-minute equal-weight market return"
+  },
+  "selection": {
+    "raw_return": {
+      "ridge": {
+        "target_column": "t1_same_minute_open",
+        "model_selection": {
+          "family": "ridge",
+          "parameters": {
+            "alpha": 100.0
+          },
+          "mae_bps": 191.27049084655127,
+          "rmse_bps": 235.39369494863942,
+          "pearson_ic": 0.1386520997484128,
+          "spearman_ic": 0.0945695950750704,
+          "nonflat_sign_accuracy": 0.43808049535603716,
+          "predicted_mean_bps": 27.77073230306981,
+          "predicted_std_bps": 59.17162218249217
+        },
+        "strategy_selection": {
+          "horizon": "t1_same_minute_open",
+          "prediction_column": "raw_return__ridge__prediction_bps",
+          "threshold_bps": 57.47426986694336,
+          "top_k": 1,
+          "interval_minutes": 60,
+          "periods": 10,
+          "active_periods": 25,
+          "coverage": 0.8333333333333334,
+          "gross_total_return": -0.006068720148442508,
+          "net_total_return": -0.010209748653381312,
+          "matched_market_total_return": -0.06305460467905777,
+          "cumulative_return_gap_vs_matched_market": 0.05284485602567646,
+          "excess_vs_matched_market": 0.05640121216196903,
+          "mean_selected_names": 1.0
+        },
+        "validation_target_metrics": {
+          "mae_bps": 191.27049084655127,
+          "rmse_bps": 235.39369494863942,
+          "pearson_ic": 0.1386520997484128,
+          "spearman_ic": 0.0945695950750704,
+          "nonflat_sign_accuracy": 0.43808049535603716,
+          "predicted_mean_bps": 27.77073230306981,
+          "predicted_std_bps": 59.17162218249217
+        }
+      },
+      "hist_gradient_boosting_regressor": {
+        "target_column": "t1_same_minute_open",
+        "model_selection": {
+          "family": "hist_gradient_boosting_regressor",
+          "parameters": {
+            "max_leaf_nodes": 31,
+            "l2_regularization": 1.0
+          },
+          "mae_bps": 197.82652193606862,
+          "rmse_bps": 247.62277349187116,
+          "pearson_ic": -0.03544830455855072,
+          "spearman_ic": -0.03381124980731145,
+          "nonflat_sign_accuracy": 0.40385276917784657,
+          "predicted_mean_bps": 23.265640648845352,
+          "predicted_std_bps": 75.10627195559914
+        },
+        "strategy_selection": {
+          "horizon": "t1_same_minute_open",
+          "prediction_column": "raw_return__hist_gradient_boosting_regressor__prediction_bps",
+          "threshold_bps": 157.99084979586445,
+          "top_k": 1,
+          "interval_minutes": 30,
+          "periods": 10,
+          "active_periods": 13,
+          "coverage": 0.26,
+          "gross_total_return": 0.016140194190212176,
+          "net_total_return": 0.014823832399337933,
+          "matched_market_total_return": -0.018987222690917016,
+          "cumulative_return_gap_vs_matched_market": 0.03381105509025495,
+          "excess_vs_matched_market": 0.03446545842450566,
+          "mean_selected_names": 1.0
+        },
+        "validation_target_metrics": {
+          "mae_bps": 197.82652193606862,
+          "rmse_bps": 247.62277349187116,
+          "pearson_ic": -0.03544830455855072,
+          "spearman_ic": -0.03381124980731145,
+          "nonflat_sign_accuracy": 0.40385276917784657,
+          "predicted_mean_bps": 23.265640648845352,
+          "predicted_std_bps": 75.10627195559914
+        }
+      }
+    },
+    "market_excess_return": {
+      "ridge": {
+        "target_column": "t1_same_minute_open__market_excess",
+        "model_selection": {
+          "family": "ridge",
+          "parameters": {
+            "alpha": 100.0
+          },
+          "mae_bps": 152.54831935536188,
+          "rmse_bps": 191.61745034000384,
+          "pearson_ic": 0.1472602996540018,
+          "spearman_ic": 0.07797014244946676,
+          "nonflat_sign_accuracy": 0.48254237288135593,
+          "predicted_mean_bps": 18.367014776746096,
+          "predicted_std_bps": 40.40211029028543
+        },
+        "strategy_selection": {
+          "horizon": "t1_same_minute_open",
+          "prediction_column": "market_excess_return__ridge__prediction_bps",
+          "threshold_bps": 29.803607559204103,
+          "top_k": 2,
+          "interval_minutes": 15,
+          "periods": 10,
+          "active_periods": 81,
+          "coverage": 0.9,
+          "gross_total_return": -0.028662308157686556,
+          "net_total_return": -0.03303662039564648,
+          "matched_market_total_return": -0.06555025716776341,
+          "cumulative_return_gap_vs_matched_market": 0.03251363677211694,
+          "excess_vs_matched_market": 0.03479441994769128,
+          "mean_selected_names": 1.5061728395061729
+        },
+        "validation_target_metrics": {
+          "mae_bps": 152.54831935536188,
+          "rmse_bps": 191.61745034000384,
+          "pearson_ic": 0.1472602996540018,
+          "spearman_ic": 0.07797014244946676,
+          "nonflat_sign_accuracy": 0.48254237288135593,
+          "predicted_mean_bps": 18.367014776746096,
+          "predicted_std_bps": 40.40211029028543
+        }
+      },
+      "hist_gradient_boosting_regressor": {
+        "target_column": "t1_same_minute_open__market_excess",
+        "model_selection": {
+          "family": "hist_gradient_boosting_regressor",
+          "parameters": {
+            "max_leaf_nodes": 15,
+            "l2_regularization": 1.0
+          },
+          "mae_bps": 155.48356636280312,
+          "rmse_bps": 196.1847708336381,
+          "pearson_ic": -0.010801236743924506,
+          "spearman_ic": -0.04431554393275131,
+          "nonflat_sign_accuracy": 0.46288135593220336,
+          "predicted_mean_bps": 8.520615625889674,
+          "predicted_std_bps": 35.10441462485151
+        },
+        "strategy_selection": {
+          "horizon": "t1_same_minute_open",
+          "prediction_column": "market_excess_return__hist_gradient_boosting_regressor__prediction_bps",
+          "threshold_bps": 0.0,
+          "top_k": 1,
+          "interval_minutes": 60,
+          "periods": 10,
+          "active_periods": 30,
+          "coverage": 1.0,
+          "gross_total_return": -0.04649771823330129,
+          "net_total_return": -0.05127758327020249,
+          "matched_market_total_return": -0.07088420664739503,
+          "cumulative_return_gap_vs_matched_market": 0.019606623377192545,
+          "excess_vs_matched_market": 0.021102454093955725,
+          "mean_selected_names": 1.0
+        },
+        "validation_target_metrics": {
+          "mae_bps": 155.48356636280312,
+          "rmse_bps": 196.1847708336381,
+          "pearson_ic": -0.010801236743924506,
+          "spearman_ic": -0.04431554393275131,
+          "nonflat_sign_accuracy": 0.46288135593220336,
+          "predicted_mean_bps": 8.520615625889674,
+          "predicted_std_bps": 35.10441462485151
+        }
+      }
+    }
+  },
+  "cost": {
+    "sell_fee_bps": 5.0,
+    "buy_cost_bps": 0.0
+  },
+  "known_limitation": "historical test dates were inspected in earlier project research"
+}

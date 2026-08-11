@@ -1,6 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
+set "PYTHONPATH=%CD%;%PYTHONPATH%"
 
 where py >nul 2>nul
 if not errorlevel 1 (
