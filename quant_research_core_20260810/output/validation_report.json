@@ -154,6 +154,13 @@
         }
       }
     },
+    "task1_data_quality_extension": {
+      "status": "passed",
+      "daily_scope": "all 302 dates x 300 stocks",
+      "minute_sampled_days": 24,
+      "rule_violations": 0,
+      "max_1500_close_error": 0.0
+    },
     "tasks2_3": {
       "status": "passed",
       "factor_count": 10,
@@ -180,6 +187,21 @@
         "latest_quarter": "2026Q2",
         "latest_quarter_positive_factor_count": 9,
         "single_factor_market_rows": 10
+      },
+      "multi_horizon_extension": {
+        "rows": 16,
+        "horizons": [
+          1,
+          2,
+          5,
+          10
+        ],
+        "rank_ic_sign_consistency": {
+          "buy_sell_imbalance": false,
+          "example_factor": true,
+          "momentum_20d": true,
+          "volume_price_corr_20d": true
+        }
       }
     },
     "task4": {
@@ -243,6 +265,14 @@
           "market_total_return": -0.07299362536581144,
           "geometric_excess_return": 0.2146151525003468
         }
+      },
+      "chronological_stability_extension": {
+        "configurations": 18,
+        "fold_rows": 72,
+        "canonical_positive_folds": {
+          "close": 3,
+          "open": 2
+        }
       }
     },
     "task5": {
@@ -305,6 +335,13 @@
           "ridge": -0.0965881295,
           "hist_gradient_boosting_regressor": -0.0842419853
         }
+      },
+      "uncertainty_extension": {
+        "classification_days": 10,
+        "t1_settled_days": 9,
+        "accuracy_probability_above_majority": 1.0,
+        "classification_rows": 3,
+        "strategy_rows": 2
       },
       "feature_and_component_independence": {
         "selection_split": "train",

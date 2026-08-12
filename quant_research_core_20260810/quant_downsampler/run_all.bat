@@ -32,6 +32,9 @@ if errorlevel 1 exit /b %errorlevel%
 call run.bat run_factor_independence.py
 if errorlevel 1 exit /b %errorlevel%
 
+call run.bat run_comprehensive_extensions.py --sections data factor task4
+if errorlevel 1 exit /b %errorlevel%
+
 call run.bat run_factor_models.py --out ..\output\factor_models_aligned
 if errorlevel 1 exit /b %errorlevel%
 
@@ -60,6 +63,8 @@ if /I "%~1"=="--with-lstm" (
     call run.bat run_lstm_feature_independence.py --epochs 8 --sell-fee-bps 5 --device cpu
     if errorlevel 1 exit /b %errorlevel%
     call run.bat run_lstm_minimal_four.py --epochs 8 --sell-fee-bps 5 --device cpu
+    if errorlevel 1 exit /b %errorlevel%
+    call run.bat run_comprehensive_extensions.py --sections task5
     if errorlevel 1 exit /b %errorlevel%
 )
 

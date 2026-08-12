@@ -49,6 +49,15 @@ def compute_ic_table(
     return pd.DataFrame(rows)
 
 
+def mask_nontradable_forward_returns(
+    forward_return: pd.DataFrame,
+    volume: pd.DataFrame,
+) -> pd.DataFrame:
+    """Keep labels only when the stock traded on signal and realization dates."""
+    tradable = (volume > 0) & (volume.shift(-1) > 0)
+    return forward_return.where(tradable)
+
+
 def aggregate_ic(ic_daily: pd.DataFrame, frequency: str) -> pd.DataFrame:
     """Summarise daily IC by a pandas calendar period."""
     periods = ic_daily.index.to_period(frequency)
@@ -238,6 +247,9 @@ def run_factor_robustness(
     daily = load_daily_data(root / "daily")
     bundle = compute_all_factors(daily)
     forward = bundle["forward_return_1d"]
+    # Match the formal Task2–3 evaluation universe: a stock contributes to
+    # IC only when it traded on both the signal and realization dates.
+    forward = mask_nontradable_forward_returns(forward, daily["volume"])
     factors = {name: value for name, value in bundle.items() if name != "forward_return_1d"}
 
     ic = compute_ic_table(factors, forward, "pearson")

@@ -1,0 +1,4 @@
+metric,estimate,ci_low,ci_high,probability_above_majority_baseline
+accuracy,0.4645762712,0.4481355932,0.4825423729,1.0000000000
+balanced_accuracy,0.4617892947,0.4513228348,0.4732225159,
+macro_f1,0.4593136172,0.4465783183,0.4720673891,

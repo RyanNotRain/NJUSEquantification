@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "horizons": [
+    1,
+    2,
+    5,
+    10
+  ],
+  "factor_count": 4,
+  "rows": 16,
+  "rank_ic_sign_consistency": {
+    "buy_sell_imbalance": false,
+    "example_factor": true,
+    "momentum_20d": true,
+    "volume_price_corr_20d": true
+  },
+  "selection_policy": "diagnostic only; no horizon is selected from test performance"
+}

@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "iterations": 5000,
+  "classification_cluster": "test trading date",
+  "classification_days": 10,
+  "t1_settled_days": 9,
+  "accuracy_probability_above_majority": 1.0,
+  "known_limitation": "only 10 classification dates and 9 settled T+1 dates; intervals are necessarily wide"
+}

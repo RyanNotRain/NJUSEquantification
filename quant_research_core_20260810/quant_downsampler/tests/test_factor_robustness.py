@@ -10,6 +10,7 @@ from qd.factor_robustness import (
     build_market_regimes,
     compute_ic_table,
     ic_by_regime,
+    mask_nontradable_forward_returns,
 )
 
 
@@ -38,6 +39,15 @@ class FactorRobustnessTests(unittest.TestCase):
         regimes = build_market_regimes(close, trend_window=2)
         self.assertEqual(regimes.loc[dates[-1], "known_market_trend"], "bull")
         self.assertTrue(pd.isna(regimes.loc[dates[-1], "target_market_return"]))
+
+    def test_robustness_masks_signal_or_realization_day_halts(self) -> None:
+        dates = pd.date_range("2026-01-01", periods=3)
+        forward = pd.DataFrame({"a": [0.1, 0.2, 0.3], "b": [0.4, 0.5, 0.6]}, index=dates)
+        volume = pd.DataFrame({"a": [1.0, 0.0, 1.0], "b": [1.0, 1.0, 1.0]}, index=dates)
+        masked = mask_nontradable_forward_returns(forward, volume)
+        self.assertTrue(pd.isna(masked.loc[dates[0], "a"]))
+        self.assertTrue(pd.isna(masked.loc[dates[1], "a"]))
+        self.assertEqual(masked.loc[dates[0], "b"], 0.4)
 
 
 if __name__ == "__main__":

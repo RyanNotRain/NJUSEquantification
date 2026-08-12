@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "configurations": 18,
+  "fold_rows": 72,
+  "fold_policy": "four non-overlapping chronological folds after each configuration's first execution",
+  "canonical_positive_folds": {
+    "close": 3,
+    "open": 2
+  },
+  "all_configuration_positive_fold_distribution": {
+    "1": 1,
+    "2": 3,
+    "3": 12,
+    "4": 2
+  },
+  "selection_policy": "sensitivity diagnostic only; no configuration is promoted using these results"
+}

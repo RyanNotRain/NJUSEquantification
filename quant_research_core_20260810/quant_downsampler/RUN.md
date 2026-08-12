@@ -37,6 +37,9 @@ py -3 -m scripts.run_factor_robustness --iterations 2000 --block-length 5
 # 因子相关性聚类、代表因子冻结、截面正交化与同区间严格回测
 py -3 -m scripts.run_factor_independence --calibration-days 120 --correlation-threshold 0.60
 
+# 数据质量抽样审计、正式4因子多期限衰减、Task4多配置四折稳定性
+py -3 -m scripts.run_comprehensive_extensions --sections data factor task4
+
 # Task 4：先跑题目正式4因子，再跑10因子扩展对照
 py -3 scripts\run_task4_strict.py --factor-set required --lookback 60 --top-n 10 --out ..\output\backtest_required
 py -3 scripts\run_task4_strict.py --factor-set extended --lookback 60 --top-n 10 --out ..\output\backtest_strict
@@ -84,6 +87,9 @@ py -3 -m scripts.run_lstm_feature_independence --correlation-threshold 0.85 --ep
 
 # 原题 Time/Price/Volume/BSFlag 映射的四特征最小基线
 py -3 -m scripts.run_lstm_minimal_four --epochs 8 --sell-fee-bps 5 --device cpu
+
+# Task5按交易日整块Bootstrap：分类指标与T+1超额置信区间
+py -3 -m scripts.run_comprehensive_extensions --sections task5
 
 # 检查扩展融合网格；参数只在验证集选择
 py -3 -m scripts.analyze_lstm_fusion_grid --run-dir ..\output\lstm_ensemble

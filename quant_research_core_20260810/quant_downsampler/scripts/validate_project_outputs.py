@@ -39,6 +39,26 @@ def main() -> None:
         }
     checks["task1_minute"] = {"status": "passed", "channels": minute_summary}
 
+    quality_root = OUTPUT_DIR / "data_quality_extension"
+    quality_summary = json.loads((quality_root / "summary.json").read_text(encoding="utf-8"))
+    sampled_minute = pd.read_csv(quality_root / "sampled_minute_summary.csv")
+    quality_checks = pd.read_csv(quality_root / "quality_checks.csv")
+    if (
+        quality_summary.get("status") != "completed"
+        or quality_summary.get("total_rule_violations") != 0
+        or len(sampled_minute) != 24
+        or not sampled_minute["bars"].eq(TOTAL_BARS).all()
+        or not sampled_minute["stocks"].eq(300).all()
+        or not np.isclose(sampled_minute["close_1500_vs_daily_max_abs_error"], 0.0).all()
+        or int(quality_checks["violations"].sum()) != 0
+    ):
+        raise AssertionError("data-quality extension is incomplete or has unexplained violations")
+    checks["task1_data_quality_extension"] = {
+        "status": "passed", "daily_scope": quality_summary["daily_scope"],
+        "minute_sampled_days": int(len(sampled_minute)), "rule_violations": 0,
+        "max_1500_close_error": float(sampled_minute["close_1500_vs_daily_max_abs_error"].max()),
+    }
+
     factor_summary = pd.read_csv(OUTPUT_DIR / "evaluation" / "factor_summary.csv")
     required_factor_columns = {
         "factor", "IC", "IR", "ICIR", "rank_IC", "rank_IR", "rank_ICIR"
@@ -99,6 +119,21 @@ def main() -> None:
             "latest_quarter_positive_factor_count"
         ],
         "single_factor_market_rows": int(len(single_factor)),
+    }
+    horizon_root = OUTPUT_DIR / "factor_horizon_extension"
+    horizon_summary = json.loads((horizon_root / "summary.json").read_text(encoding="utf-8"))
+    horizon_metrics = pd.read_csv(horizon_root / "horizon_metrics.csv")
+    if (
+        horizon_summary.get("status") != "completed"
+        or len(horizon_metrics) != 16
+        or set(horizon_metrics["factor"]) != set(REQUIRED_FACTOR_NAMES)
+        or set(horizon_metrics["horizon_days"]) != {1, 2, 5, 10}
+        or not (horizon_root / "factor_horizon_decay.png").exists()
+    ):
+        raise AssertionError("required-factor multi-horizon extension is incomplete")
+    checks["tasks2_3"]["multi_horizon_extension"] = {
+        "rows": int(len(horizon_metrics)), "horizons": [1, 2, 5, 10],
+        "rank_ic_sign_consistency": horizon_summary["rank_ic_sign_consistency"],
     }
 
     backtest = pd.read_csv(OUTPUT_DIR / "backtest_strict" / "metrics.csv")
@@ -281,6 +316,27 @@ def main() -> None:
         "best_post_freeze_by_geometric_excess": independence_summary[
             "best_post_freeze_by_geometric_excess"
         ],
+    }
+    chronological_root = OUTPUT_DIR / "task4_chronological_extension"
+    chronological_summary = json.loads(
+        (chronological_root / "summary.json").read_text(encoding="utf-8")
+    )
+    chronological_folds = pd.read_csv(chronological_root / "fold_metrics.csv")
+    chronological_configs = pd.read_csv(chronological_root / "configuration_summary.csv")
+    if (
+        chronological_summary.get("status") != "completed"
+        or len(chronological_folds) != 72
+        or len(chronological_configs) != 18
+        or set(chronological_folds["fold"]) != {1, 2, 3, 4}
+        or set(chronological_configs["lookback"]) != {40, 60, 90}
+        or set(chronological_configs["top_n"]) != {5, 10, 20}
+        or not (chronological_root / "canonical_fold_excess.png").exists()
+    ):
+        raise AssertionError("Task4 chronological stability extension is incomplete")
+    checks["task4"]["chronological_stability_extension"] = {
+        "configurations": int(len(chronological_configs)),
+        "fold_rows": int(len(chronological_folds)),
+        "canonical_positive_folds": chronological_summary["canonical_positive_folds"],
     }
 
     lstm_metrics = json.loads(
@@ -512,6 +568,32 @@ def main() -> None:
                 excess_target_metrics["target"].eq("market_excess_return")
             ].iterrows()
         },
+    }
+    uncertainty_root = OUTPUT_DIR / "task5_uncertainty_extension"
+    uncertainty_summary = json.loads(
+        (uncertainty_root / "summary.json").read_text(encoding="utf-8")
+    )
+    uncertainty_classification = pd.read_csv(
+        uncertainty_root / "classification_day_cluster_bootstrap.csv"
+    )
+    uncertainty_strategy = pd.read_csv(uncertainty_root / "t1_strategy_bootstrap.csv")
+    if (
+        uncertainty_summary.get("status") != "completed"
+        or uncertainty_summary.get("classification_days") != 10
+        or uncertainty_summary.get("t1_settled_days") != 9
+        or set(uncertainty_classification["metric"])
+        != {"accuracy", "balanced_accuracy", "macro_f1"}
+        or set(uncertainty_strategy["strategy"]) != {"balanced_up", "strict_up"}
+        or not (uncertainty_root / "task5_uncertainty.png").exists()
+    ):
+        raise AssertionError("Task5 uncertainty extension is incomplete")
+    checks["task5"]["uncertainty_extension"] = {
+        "classification_days": 10, "t1_settled_days": 9,
+        "accuracy_probability_above_majority": uncertainty_summary[
+            "accuracy_probability_above_majority"
+        ],
+        "classification_rows": int(len(uncertainty_classification)),
+        "strategy_rows": int(len(uncertainty_strategy)),
     }
 
     feature_root = OUTPUT_DIR / "lstm_feature_independence"
